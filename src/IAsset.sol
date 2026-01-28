@@ -11,7 +11,14 @@ interface IAsset {
     
     function viewSubscription(address user) external view returns (bool);
     
-    function subscribe(uint256 duration) external;
+    function subscribe(
+        address owner,
+        address spender,
+        uint256 value,
+        uint256 deadline,
+        uint8 v,
+        bytes32 r,
+        bytes32 s) external returns (bool);
     
     function revokeSubscription(address user) external returns (bool);
 }
