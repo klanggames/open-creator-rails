@@ -1,0 +1,34 @@
+name: run
+
+on:
+  workflow_dispatch:
+    inputs:
+      file_name:
+        description: "File to run"
+        required: true
+        type: string
+        default: ""
+      signature:
+        description: "Signature of the function to run"
+        required: false
+        type: string
+        default: "run()"
+      args:
+        description: "Arguments of the function to run"
+        required: false
+        type: string
+        default: ""
+
+jobs:
+  run-script:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run
+        uses: ChainSafe/open-creator-rails/.github/actions/run@main
+        with:
+          file_name: ${{ inputs.file_name }}
+          signature: ${{ inputs.signature }}
+          args: ${{ inputs.args }}
+        env:
+          PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
+          RPC_URL: ${{ secrets.RPC_URL }}

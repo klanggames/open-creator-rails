@@ -1,0 +1,42 @@
+name: run
+description: Run a script
+
+inputs:
+  file_name:
+    required: true
+    type: string
+    description: The name of the file to run eg GameToken
+  signature:
+    required: false
+    type: string
+    description: The signature of the function to run eg mint(address,uint256)
+    default: "run()"
+  args:
+    required: false
+    type: string
+    description: The arguments of the function to run eg 0xf11B7A2B2D457Bc666310BF76F859b48AcDE5F3e 1000000
+    default: ""
+
+outputs:
+  output:
+    description: The output of the run
+    value: ${{ steps.run-script.outputs.output }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    - name: Install Foundry
+      uses: foundry-rs/foundry-toolchain@v1
+      with:
+        version: stable
+    - name: Run Script
+      id: run-script
+      run: |
+        source ./script/utils.sh
+        OUTPUT=$(./script/run.sh ${{ inputs.file_name }} ${{ inputs.signature }} ${{ inputs.args }})
+        echo "output=$OUTPUT" >> $GITHUB_OUTPUT
+      shell: bash

@@ -46,6 +46,7 @@ runs:
     - name: Deploy Contract
       id: deploy-contract
       run: |
+        source ./script/utils.sh
         FORCE_FLAG=""
         if [ "${{ inputs.force_deploy }}" == "true" ]; then
           FORCE_FLAG=" --force"
