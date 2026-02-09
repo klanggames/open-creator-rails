@@ -4,6 +4,8 @@ if [ -f .env ]; then
     source .env
 fi
 
+source ./script/utils.sh
+
 # Parse flags
 FORCE_DEPLOY=false
 while [[ $# -gt 0 ]]; do

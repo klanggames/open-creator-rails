@@ -4,6 +4,8 @@ if [ -f .env ]; then
     source .env
 fi
 
+source ./script/utils.sh
+
 FILE_NAME=$1
 
 SCRIPT_NAME="${FILE_NAME}Script"

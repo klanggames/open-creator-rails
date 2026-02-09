@@ -36,6 +36,7 @@ runs:
     - name: Run Script
       id: run-script
       run: |
+        source ./script/utils.sh
         OUTPUT=$(./script/run.sh ${{ inputs.file_name }} ${{ inputs.signature }} ${{ inputs.args }})
         echo "output=$OUTPUT" >> $GITHUB_OUTPUT
       shell: bash
