@@ -10,7 +10,7 @@ contract AssetRegistryTest is BaseTest {
     function setUp() public override {
         super.setUp();
 
-        vm.startPrank(REGISTRY_OWNER);
+        vm.startPrank(registryOwner);
         assetRegistry = new AssetRegistry(70, 30);
         vm.stopPrank();
     }
@@ -21,8 +21,8 @@ contract AssetRegistryTest is BaseTest {
             return;
         }
 
-        vm.startPrank(REGISTRY_OWNER);
-        asset = IAsset(assetRegistry.createAsset(ASSET_ID, SUBSCRIPTION_PRICE, address(gameToken), ASSET_OWNER));
+        vm.startPrank(registryOwner);
+        asset = IAsset(assetRegistry.createAsset(ASSET_ID, SUBSCRIPTION_PRICE, address(gameToken), assetOwner));
         vm.stopPrank();
         
         assertEq(asset.getAssetId(), ASSET_ID);
@@ -90,11 +90,11 @@ contract AssetRegistryTest is BaseTest {
     }
 
     function test_updateFeeShare() public {
-        vm.startPrank(REGISTRY_OWNER);
+        vm.startPrank(registryOwner);
         assetRegistry.updateCreatorFeeShare(80);
         assetRegistry.updateRegistryFeeShare(20);
         vm.stopPrank();
-        
+
         assertEq(assetRegistry.getCreatorFee(100000000), 80000000);
         assertEq(assetRegistry.getRegistryFee(100000000), 20000000);
     }

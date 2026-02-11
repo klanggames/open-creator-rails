@@ -5,14 +5,6 @@ import {BaseTest} from "./Base.t.sol";
 import {Asset} from "../src/Asset.sol";
 
 contract AssetTest is BaseTest {
-    address internal REGISTRY_ADDRESS;
-
-    function setUp() public override {
-        super.setUp();
-
-        REGISTRY_ADDRESS = address(assetRegistry);
-    }
-
     function test_getAssetId() public view {
         assertEq(asset.getAssetId(), ASSET_ID);
     }
@@ -45,7 +37,7 @@ contract AssetTest is BaseTest {
         
         test_subscribe();
 
-        vm.startPrank(ASSET_OWNER);
+        vm.startPrank(assetOwner);
         bool success = asset.revokeSubscription(signer);
         vm.stopPrank();
 
@@ -84,8 +76,8 @@ contract AssetTest is BaseTest {
     }
 
     function test_feeSplit() public {
-        uint256 creatorBalance = gameToken.balanceOf(ASSET_OWNER);
-        uint256 registryBalance = gameToken.balanceOf(REGISTRY_OWNER);
+        uint256 creatorBalance = gameToken.balanceOf(assetOwner);
+        uint256 registryBalance = gameToken.balanceOf(registryOwner);
         
         test_subscribe();
 
@@ -94,7 +86,7 @@ contract AssetTest is BaseTest {
         uint256 creatorFee = assetRegistry.getCreatorFee(value);
         uint256 registryFee = assetRegistry.getRegistryFee(value);
 
-        assertEq(gameToken.balanceOf(ASSET_OWNER), creatorBalance + creatorFee);
-        assertEq(gameToken.balanceOf(REGISTRY_OWNER), registryBalance + registryFee);
+        assertEq(gameToken.balanceOf(assetOwner), creatorBalance + creatorFee);
+        assertEq(gameToken.balanceOf(registryOwner), registryBalance + registryFee);
     }
 }

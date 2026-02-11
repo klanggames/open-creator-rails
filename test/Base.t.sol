@@ -4,7 +4,6 @@ pragma solidity ^0.8.0;
 import {Test} from "forge-std/Test.sol";
 import {GameToken} from "../src/GameToken.sol";
 import {IAsset} from "../src/IAsset.sol";
-import {Asset} from "../src/Asset.sol";
 import {IAssetRegistry} from "../src/IAssetRegistry.sol";
 import {AssetRegistry} from "../src/AssetRegistry.sol";
 
@@ -23,8 +22,8 @@ contract BaseTest is Test {
     uint256 internal constant SUBSCRIPTION_PRICE = 100000000;
     uint256 internal constant DURATION = 3600;
 
-    address internal ASSET_OWNER;
-    address internal REGISTRY_OWNER;
+    address internal assetOwner;
+    address internal registryOwner;
 
     address internal signer;
     uint256 internal key;
@@ -39,12 +38,12 @@ contract BaseTest is Test {
 
         gameToken.mint(signer, 1000000000000000000000000000000000000000);
 
-        REGISTRY_OWNER = address(1);
-        ASSET_OWNER = address(2);
+        registryOwner = address(1);
+        assetOwner = address(2);
 
-        vm.startPrank(REGISTRY_OWNER);
+        vm.startPrank(registryOwner);
         assetRegistry = new AssetRegistry(70, 30);
-        asset = IAsset(assetRegistry.createAsset(ASSET_ID, SUBSCRIPTION_PRICE, address(gameToken), ASSET_OWNER));
+        asset = IAsset(assetRegistry.createAsset(ASSET_ID, SUBSCRIPTION_PRICE, address(gameToken), assetOwner));
         vm.stopPrank();
     }
 
