@@ -1,26 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {Asset} from "../src/Asset.sol";
 import {BaseTest} from "./Base.t.sol";
+import {Asset} from "../src/Asset.sol";
 
 contract AssetTest is BaseTest {
-    Asset public asset;
-
-    string internal constant ASSET_ID = "asset_id";
-    uint256 internal constant SUBSCRIPTION_PRICE = 100000000;
-
-    address internal owner;
-
-    function setUp() public override {
-        super.setUp();
-
-        owner = signer;
-        asset = new Asset(keccak256(abi.encodePacked(ASSET_ID)), SUBSCRIPTION_PRICE, address(gameToken), owner);
-    }
-
     function test_getAssetId() public view {
-        assertEq(asset.getAssetId(), keccak256(abi.encodePacked(ASSET_ID)));
+        assertEq(asset.getAssetId(), ASSET_ID);
     }
 
     function test_getSubscriptionPrice() public view {
@@ -28,14 +14,20 @@ contract AssetTest is BaseTest {
     }
 
     function test_subscribe() public {
-        
-        uint256 duration = 3600;
 
+        vm.startPrank(signer);
+        bool hasSubscription = asset.viewMySubscription();
+        vm.stopPrank();
+        if (hasSubscription) {
+            return;
+        }
+        
+        address owner = signer;
         address spender = address(asset);
         
-        uint256 value = asset.getSubscriptionPrice(duration);
+        uint256 value = asset.getSubscriptionPrice(DURATION);
 
-        uint256 deadline = block.timestamp + duration;
+        uint256 deadline = block.timestamp + DURATION;
         
         (uint8 v, bytes32 r, bytes32 s) = getPermit(owner, spender, value, deadline);        
         
@@ -43,40 +35,65 @@ contract AssetTest is BaseTest {
         
         assertTrue(success);
 
+        vm.startPrank(signer);
         assertEq(asset.getMySubscription(), deadline);
+        vm.stopPrank();
     }
 
     function test_revokeSubscription() public {
         
         test_subscribe();
 
-        bool success = asset.revokeSubscription(owner);
-        
+        vm.startPrank(assetOwner);
+        bool success = asset.revokeSubscription(signer);
+        vm.stopPrank();
+
         assertTrue(success);
 
+        vm.startPrank(signer);
         assertEq(asset.getMySubscription(), 0);
+        vm.stopPrank();
     }
 
     function test_viewSubscription() public {
         
         test_subscribe();
 
+        vm.startPrank(signer);
         assertEq(asset.viewMySubscription(), true);
+        vm.stopPrank();
 
         test_revokeSubscription();
 
+        vm.startPrank(signer);
         assertEq(asset.viewMySubscription(), false);
+        vm.stopPrank();
     }
 
     function test_unauthorized() public {
-        vm.startPrank(address(1));
+        vm.startPrank(address(403));
 
-        vm.expectRevert(Asset.Unauthorized.selector);
-        asset.getSubscription(address(1));
+        vm.expectRevert(Asset.OnlyRegistryOrOwnerUnauthorizedAccount.selector);
+        asset.getSubscription(signer);
 
-        vm.expectRevert(Asset.Unauthorized.selector);
-        asset.viewSubscription(address(1));
+        vm.expectRevert(Asset.OnlyRegistryOrOwnerUnauthorizedAccount.selector);
+        asset.viewSubscription(signer);
 
         vm.stopPrank();
+    }
+
+    function test_feeSplit() public {
+        uint256 creatorBalance = gameToken.balanceOf(assetOwner);
+        uint256 registryBalance = gameToken.balanceOf(registryOwner);
+        
+        test_subscribe();
+
+        uint256 value = SUBSCRIPTION_PRICE * DURATION;
+
+        uint256 creatorFee = assetRegistry.getCreatorFee(value);
+        uint256 registryFee = assetRegistry.getRegistryFee(value);
+
+        assertEq(gameToken.balanceOf(assetOwner), creatorBalance + creatorFee);
+        assertEq(gameToken.balanceOf(registryOwner), registryBalance + registryFee);
     }
 }

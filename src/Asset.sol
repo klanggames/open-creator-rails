@@ -5,29 +5,35 @@ import {IAsset} from "./IAsset.sol";
 import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 import {IERC20Permit} from "lib/openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Permit.sol";
 import {IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
+import {IAssetRegistry} from "./IAssetRegistry.sol";
+import {ReentrancyGuard} from "lib/openzeppelin-contracts/contracts/utils/ReentrancyGuard.sol";
 
-contract Asset is Ownable, IAsset {
+contract Asset is Ownable, ReentrancyGuard, IAsset {
     bytes32 internal immutable ASSET_ID;
     uint256 internal immutable SUBSCRIPTION_PRICE;
     address internal immutable TOKEN_ADDRESS;
+    address internal immutable REGISTRY_ADDRESS;
+
+    IAssetRegistry internal immutable ASSET_REGISTRY;
 
     mapping(address => uint256) internal subscriptions;
-    address internal immutable REGISTRY_ADDRESS;
-        
+
     error InvalidSpender();
     error PermitFailed();
     error SubscriptionFailed();
     error InsufficientFunds();
-    error Unauthorized();
+    error OnlyRegistryOrOwnerUnauthorizedAccount();
+    error BannedAddress();
 
     event SubscriptionAdded(address indexed user, uint256 expiresAt);
     event SubscriptionRevoked(address indexed user);
-    
+
     constructor(bytes32 _assetId, uint256 _subscriptionPrice, address _tokenAddress, address _owner) Ownable(_owner) {
         ASSET_ID = _assetId;
         SUBSCRIPTION_PRICE = _subscriptionPrice;
         TOKEN_ADDRESS = _tokenAddress;
         REGISTRY_ADDRESS = msg.sender;
+        ASSET_REGISTRY = IAssetRegistry(REGISTRY_ADDRESS);
     }
 
     function getAssetId() external view returns (bytes32) {
@@ -42,12 +48,8 @@ contract Asset is Ownable, IAsset {
         return subscriptions[msg.sender];
     }
 
-    function getSubscription(address user) external view returns (uint256) {
+    function getSubscription(address user) external onlyRegsitryOrOwner view returns (uint256) {
         
-        if (msg.sender != REGISTRY_ADDRESS && msg.sender != owner()) {
-            revert Unauthorized();
-        }
-
         return subscriptions[user];
     }
 
@@ -55,17 +57,13 @@ contract Asset is Ownable, IAsset {
         return subscriptions[msg.sender] > block.timestamp;
     }
 
-    function viewSubscription(address user) external view returns (bool) {
-        
-        if (msg.sender != REGISTRY_ADDRESS && msg.sender != owner()) {
-            revert Unauthorized();
-        }
+    function viewSubscription(address user) external onlyRegsitryOrOwner view returns (bool) {
         
         return subscriptions[user] > block.timestamp;
     }
 
-    function subscribe(address owner, address spender, uint256 value, uint256 deadline, uint8 v, bytes32 r, bytes32 s) external returns (bool) {
-        
+    function subscribe(address owner, address spender, uint256 value, uint256 deadline, uint8 v, bytes32 r, bytes32 s) external nonReentrant returns (bool) {
+
         if (spender != address(this)) {
             revert InvalidSpender();
         }
@@ -81,8 +79,12 @@ contract Asset is Ownable, IAsset {
                 revert InsufficientFunds();
             }
 
-            bool success = tokenContract.transferFrom(owner, this.owner(), value);
+            uint256 creatorFee = ASSET_REGISTRY.getCreatorFee(value);
             
+            uint256 registryFee = ASSET_REGISTRY.getRegistryFee(value);
+
+            bool success = tokenContract.transferFrom(owner, this.owner(), creatorFee) && tokenContract.transferFrom(owner, ASSET_REGISTRY.getOwner(), registryFee);
+
             if (!success) {
                 revert SubscriptionFailed();
             }
@@ -93,7 +95,9 @@ contract Asset is Ownable, IAsset {
 
         uint256 duration = value / SUBSCRIPTION_PRICE;
 
-        subscriptions[owner] = block.timestamp + duration;
+        uint256 subscription = subscriptions[owner] > block.timestamp ? subscriptions[owner] : block.timestamp;
+
+        subscriptions[owner] = subscription + duration;
 
         emit SubscriptionAdded(owner, subscriptions[owner]);
 
@@ -109,4 +113,15 @@ contract Asset is Ownable, IAsset {
         emit SubscriptionRevoked(user);
         return true;
     }
+
+    modifier onlyRegsitryOrOwner() {
+        _onlyRegsitryOrOwner();
+        _;
+    }
+    
+    function _onlyRegsitryOrOwner() internal view {
+         if (msg.sender != REGISTRY_ADDRESS && msg.sender != owner()) {
+             revert OnlyRegistryOrOwnerUnauthorizedAccount();
+         }
+     }
 }

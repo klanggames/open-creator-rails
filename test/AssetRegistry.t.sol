@@ -6,38 +6,43 @@ import {IAsset} from "../src/IAsset.sol";
 import {BaseTest} from "./Base.t.sol";
 
 contract AssetRegistryTest is BaseTest {
-    AssetRegistry public assetRegistry;
-
-    bytes32 internal constant ASSET_ID = keccak256(abi.encodePacked("asset_id"));
 
     function setUp() public override {
         super.setUp();
 
-        assetRegistry = new AssetRegistry();
+        vm.startPrank(registryOwner);
+        assetRegistry = new AssetRegistry(70, 30);
+        vm.stopPrank();
     }
 
     function test_createAsset() public {
-        address asset = assetRegistry.createAsset(ASSET_ID, 100000000, address(gameToken), signer);
-        assertEq(IAsset(asset).getAssetId(), ASSET_ID);
-        assertEq(asset, address(assetRegistry.assets(ASSET_ID)));
+        
+        if (assetRegistry.viewAsset(ASSET_ID)) {
+            return;
+        }
+
+        vm.startPrank(registryOwner);
+        asset = IAsset(assetRegistry.createAsset(ASSET_ID, SUBSCRIPTION_PRICE, address(gameToken), assetOwner));
+        vm.stopPrank();
+        
+        assertEq(asset.getAssetId(), ASSET_ID);
+        assertEq(address(asset), assetRegistry.getAsset(ASSET_ID));
     }
 
     function test_getAsset() public {
         test_createAsset();
-        address asset = assetRegistry.getAsset(ASSET_ID);
-        assertEq(IAsset(asset).getAssetId(), ASSET_ID);
+
+        asset = IAsset(assetRegistry.getAsset(ASSET_ID));
+        assertEq(asset.getAssetId(), ASSET_ID);
     }
 
     function test_subscribe() public {
-        if (assetRegistry.assets(ASSET_ID) == address(0)) {
-            test_createAsset();
-        }
-        
+        test_createAsset();
+
         address owner = signer;
-        address spender = assetRegistry.getAsset(ASSET_ID);
-        uint256 duration = 3600;
-        uint256 value = IAsset(spender).getSubscriptionPrice(duration);
-        uint256 deadline = block.timestamp + duration;
+        address spender = address(asset);
+        uint256 value = asset.getSubscriptionPrice(DURATION);
+        uint256 deadline = block.timestamp + DURATION;
 
         (uint8 v, bytes32 r, bytes32 s) = getPermit(owner, spender, value, deadline);        
 
@@ -45,26 +50,52 @@ contract AssetRegistryTest is BaseTest {
         
         assertTrue(success);
 
-        assertEq(IAsset(spender).getSubscription(owner), deadline);
+        vm.startPrank(signer);
+        assertEq(asset.getMySubscription(), deadline);
+        vm.stopPrank();
     }
 
     function test_viewSubscription() public {
         test_createAsset();
+        
+        vm.startPrank(signer);
         assertEq(assetRegistry.viewSubscription(ASSET_ID), false);
+        vm.stopPrank();
+        
         test_subscribe();
+        
+        vm.startPrank(signer);
         assertEq(assetRegistry.viewSubscription(ASSET_ID), true);
+        vm.stopPrank();
     }
 
     function test_getSubscription() public {
         test_createAsset();
+
+        vm.startPrank(signer);
         assertEq(assetRegistry.getSubscription(ASSET_ID), 0);
+        vm.stopPrank();
+        
         test_subscribe();
+        
+        vm.startPrank(signer);
         assertTrue(assetRegistry.getSubscription(ASSET_ID) > block.timestamp);
+        vm.stopPrank();
     }
 
     function test_getSubscriptionPrice() public {
         test_createAsset();
-        address asset = assetRegistry.getAsset(ASSET_ID);
-        assertEq(assetRegistry.getSubscriptionPrice(ASSET_ID, 10), IAsset(asset).getSubscriptionPrice(10));
+
+        assertEq(assetRegistry.getSubscriptionPrice(ASSET_ID, 10), asset.getSubscriptionPrice(10));
+    }
+
+    function test_updateFeeShare() public {
+        vm.startPrank(registryOwner);
+        assetRegistry.updateCreatorFeeShare(80);
+        assetRegistry.updateRegistryFeeShare(20);
+        vm.stopPrank();
+
+        assertEq(assetRegistry.getCreatorFee(100000000), 80000000);
+        assertEq(assetRegistry.getRegistryFee(100000000), 20000000);
     }
 }
