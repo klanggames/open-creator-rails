@@ -8,6 +8,9 @@ import {IERC20} from "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.so
 import {IAssetRegistry} from "./IAssetRegistry.sol";
 import {ReentrancyGuard} from "lib/openzeppelin-contracts/contracts/utils/ReentrancyGuard.sol";
 
+/// @title Asset
+/// @notice Implementation of IAsset: a subscription-gated asset with permit-based ERC20 payment.
+///         Deployed by the asset registry; subscription revenue is split between creator (owner) and registry.
 contract Asset is Ownable, ReentrancyGuard, IAsset {
     bytes32 internal immutable ASSET_ID;
     uint256 internal immutable SUBSCRIPTION_PRICE;
@@ -23,11 +26,15 @@ contract Asset is Ownable, ReentrancyGuard, IAsset {
     error SubscriptionFailed();
     error InsufficientFunds();
     error OnlyRegistryOrOwnerUnauthorizedAccount();
-    error BannedAddress();
 
     event SubscriptionAdded(address indexed user, uint256 expiresAt);
     event SubscriptionRevoked(address indexed user);
 
+    /// @notice Initializes the asset with id, price, payment token, and owner. Callable only by the registry (msg.sender).
+    /// @param _assetId Unique identifier for this asset.
+    /// @param _subscriptionPrice Price per subscription period in seconds.
+    /// @param _tokenAddress ERC20 (with permit) used for subscription payments.
+    /// @param _owner Creator/owner of the asset; receives creator share of subscription fees.
     constructor(bytes32 _assetId, uint256 _subscriptionPrice, address _tokenAddress, address _owner) Ownable(_owner) {
         ASSET_ID = _assetId;
         SUBSCRIPTION_PRICE = _subscriptionPrice;
