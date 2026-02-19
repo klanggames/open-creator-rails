@@ -25,9 +25,8 @@ sequenceDiagram
     Note over Seed Portal: seed.game
     participant Indexer
     participant Web3Auth
-    participant Seed Backend
-    participant Asset Registry
     participant Asset
+    participant Asset Registry
 Player->>+Seed Client: Join Society
 Seed Client-->>-Player: Join Link // https://seed.game/society/{id}/join?duration={duration}
 Player->>+Seed Portal: Join
@@ -36,14 +35,14 @@ Seed Portal->>+Indexer: /registry/{assetId} // assetId == keccak256(societyId)
 Indexer-->>-Seed Portal: {assetAddress}
 Seed Portal->>+Web3Auth: signPermit(owner, spender, value, deadline) // owner == Player && spender == assetAddress
 Web3Auth-->>-Seed Portal: {v, r, s}
-Seed Portal->>+Seed Backend: society/{id}/join : { owner, spender, value, deadline, v, r, s }
-Seed Backend->>+Asset Registry: subscribe(assetId, owner, spender, value, deadline, v, r, s)
+Seed Portal->>+Asset: getRegistryAddress()
+Asset-->>-Seed Portal: {registryAddress}
+Seed Portal->>+Asset Registry: subscribe(assetId, owner, spender, value, deadline, v, r, s)
 Asset Registry->>+Asset: subscribe(owner, spender, value, deadline, v, r, s)
 Note over Asset Registry, Asset: Subscription event recorded in Indexer
 Asset-->>-Asset Registry: {true} // returns false or reverts if it fails
-Asset Registry-->>-Seed Backend: {true}
-Seed Backend-->>-Seed Portal: {success}
-Seed Portal-->>-Player: Society Joined
+Asset Registry-->>-Seed Portal: {true}
+Seed Portal-->>-Player: Society Joineds
 ```
 # Access Society
 ```mermaid

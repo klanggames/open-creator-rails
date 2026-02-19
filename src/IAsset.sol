@@ -9,6 +9,10 @@ interface IAsset {
     /// @return The asset id as a bytes32 value.
     function getAssetId() external view returns (bytes32);
 
+    /// @notice Returns the address of the registry that deployed this asset.
+    /// @return The registry address.
+    function getRegistryAddress() external view returns (address);
+
     /// @notice Returns the total price for a subscription of the given duration.
     /// @param duration Length of the subscription in seconds.
     /// @return Total price for the duration.

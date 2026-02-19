@@ -48,6 +48,10 @@ contract Asset is Ownable, ReentrancyGuard, IAsset {
         return ASSET_ID;
     }
 
+    function getRegistryAddress() external view returns (address) {
+        return REGISTRY_ADDRESS;
+    }
+
     function setSubscriptionPrice(uint256 newSubscriptionPrice) external onlyOwner {
         subscriptionPrice = newSubscriptionPrice;
         emit SubscriptionPriceUpdated(newSubscriptionPrice);
