@@ -55,6 +55,101 @@ See the initial [MVP Architecture and Design](docs/mvp-design-and-architecture.m
 
 ---
 
+## Usage
+
+### Deploying Registries
+
+Deploy an AssetRegistry with the specified fee shares:
+
+```bash
+./script/deployRegistry.sh <creator_fee_share> <registry_fee_share>
+```
+
+| Input | Description |
+|-------|--------------|
+| `creator_fee_share` | Share of subscription payments allocated to asset creators. Numerator for the split. |
+| `registry_fee_share` | Share of subscription payments allocated to the registry. Numerator for the split. |
+
+Example:
+
+```bash
+./script/deployRegistry.sh 80 20
+```
+
+Deployments are recorded in `registries_<chain_id>.json`, where `chain_id` is the chain ID of the network from `RPC_URL` (e.g. `registries_11155111.json` for Sepolia, `registries_84532.json` for Base Sepolia). The file is an array of registry objects with `address`, `creatorFeeShare`, `registryFeeShare`, `owner`, and `assets`.
+
+### Creating Assets
+
+Create an asset in a registry (registry owner only):
+
+```bash
+./script/createAsset.sh <registry_index> <asset_id> <subscription_price> <token_address> <owner>
+```
+
+| Input | Description |
+|-------|--------------|
+| `registry_index` | Zero-based index of the registry in `registries_<chain_id>.json` (e.g. `0` for the first registry). |
+| `asset_id` | Human-readable identifier for the asset. The script hashes it with keccak256 to get the bytes32 used on-chain. |
+| `subscription_price` | Price per subscription unit per second in the token's smallest unit. |
+| `token_address` | Address of the ERC20 contract used for subscription payments. Must implement ERC-2612 (Permits), as subscription payments use gasless permit approvals. |
+| `owner` | Creator/owner address of the asset; receives the creator share of subscription fees. |
+
+Example:
+
+```bash
+./script/createAsset.sh 0 "default_asset_id" 4 0x1234... 0xabcd...
+```
+
+The token address must implement ERC-2612 / IERC20Permit, as subscription payments use gasless permit approvals.
+
+New assets are appended to the `assets` array of the corresponding registry in `registries_<chain_id>.json`. Each asset entry includes `address`, `assetId`, `assetIdHash`, `subscriptionPrice`, `tokenAddress`, and `owner`.
+
+### Subscribe
+
+Subscribe to an asset using ERC-2612 permit (gasless approval). The subscriber must hold enough tokens; the script signs a permit and sends the subscribe transaction.
+
+```bash
+./script/subscribe.sh <registry_index> <asset_id> <value> <subscriber_private_key>
+```
+
+| Input | Description |
+|-------|--------------|
+| `registry_index` | Zero-based index of the registry in `registries_<chain_id>.json`. |
+| `asset_id` | Human-readable asset identifier (same string used when creating the asset). The script hashes it with keccak256 for the on-chain call. |
+| `value` | Payment amount in the token's smallest unit. Must be a multiple of the asset's subscription price; excess is rounded down. |
+| `subscriber_private_key` | Private key of the subscriber. Used to sign the permit and send the transaction; the subscriber pays gas and provides tokens. |
+
+Example:
+
+```bash
+./script/subscribe.sh 0 "default_asset_id" 10368000 0x1b97...
+```
+
+---
+
+> ### Test Tokens
+>
+> Test tokens supporting ERC-2612 (permit) are already deployed for testing subscriptions. Addresses are listed in `token_addresses.json` keyed by chain ID (e.g. Sepolia `11155111`, Base Sepolia `84532`). Anyone can mint any amount for testing.
+>
+> **Deploy a test token** (records the address in `token_addresses.json` for the current chain):
+>
+> ```bash
+> ./script/deployTestToken.sh
+> ```
+>
+> **Mint test tokens** to an address (uses the token in `token_addresses.json` for the current chain):
+>
+> ```bash
+> ./script/mintTestToken.sh <to> <amount>
+> ```
+>
+> | Input | Description |
+> |-------|--------------|
+> | `to` | Recipient address. |
+> | `amount` | Amount to mint in the token's smallest unit. |
+
+---
+
 ## RPC API Reference
 
 All external functions for the registry and asset contracts, for use with JSON-RPC (e.g. `eth_call` for reads, `eth_sendTransaction` for writes).
