@@ -24,6 +24,8 @@ contract Asset is Ownable, ReentrancyGuard, IAsset {
     mapping(address => uint256) internal subscriptions;
     uint256 internal subscriptionPrice;
 
+    error InvalidOwner();
+    error InvalidTokenAddress();
     error InvalidSpender();
     error PermitFailed();
     error SubscriptionFailed();
@@ -42,6 +44,14 @@ contract Asset is Ownable, ReentrancyGuard, IAsset {
     constructor(bytes32 _assetId, uint256 _subscriptionPrice, address _tokenAddress, address _owner) Ownable(_owner) {
         ASSET_ID = _assetId;
         subscriptionPrice = _subscriptionPrice;
+
+        if (_owner == address(0)) {
+            revert InvalidOwner();
+        }
+
+        if (_tokenAddress == address(0)) {
+            revert InvalidTokenAddress();
+        }
 
         TOKEN_ADDRESS = _tokenAddress;
 
@@ -77,7 +87,7 @@ contract Asset is Ownable, ReentrancyGuard, IAsset {
         return subscriptions[msg.sender];
     }
 
-    function getSubscription(address user) external onlyRegsitryOrOwner view returns (uint256) {
+    function getSubscription(address user) external onlyRegistryOrOwner view returns (uint256) {
         
         return subscriptions[user];
     }
@@ -86,7 +96,7 @@ contract Asset is Ownable, ReentrancyGuard, IAsset {
         return subscriptions[msg.sender] > block.timestamp;
     }
 
-    function viewSubscription(address user) external onlyRegsitryOrOwner view returns (bool) {
+    function viewSubscription(address user) external onlyRegistryOrOwner view returns (bool) {
         
         return subscriptions[user] > block.timestamp;
     }
@@ -105,9 +115,7 @@ contract Asset is Ownable, ReentrancyGuard, IAsset {
                 revert InsufficientFunds();
             }
 
-            uint256 creatorFee = ASSET_REGISTRY.getCreatorFee(value);
-            
-            uint256 registryFee = ASSET_REGISTRY.getRegistryFee(value);
+            (uint256 creatorFee, uint256 registryFee) = ASSET_REGISTRY.getFees(value);
 
             bool success = TOKEN_CONTRACT.transferFrom(owner, this.owner(), creatorFee) && TOKEN_CONTRACT.transferFrom(owner, ASSET_REGISTRY.getOwner(), registryFee);
 
@@ -142,12 +150,12 @@ contract Asset is Ownable, ReentrancyGuard, IAsset {
         return true;
     }
 
-    modifier onlyRegsitryOrOwner() {
-        _onlyRegsitryOrOwner();
+    modifier onlyRegistryOrOwner() {
+        _onlyRegistryOrOwner();
         _;
     }
     
-    function _onlyRegsitryOrOwner() internal view {
+    function _onlyRegistryOrOwner() internal view {
          if (msg.sender != REGISTRY_ADDRESS && msg.sender != owner()) {
              revert OnlyRegistryOrOwnerUnauthorizedAccount();
          }

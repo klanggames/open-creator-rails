@@ -131,12 +131,13 @@ contract AssetRegistry is Ownable, IAssetRegistry {
         emit RegistryFeeShareUpdated(registryFeeShare);
     }
 
-    function getCreatorFee(uint256 _value) external view returns (uint256) {
-        return (_value * creatorFeeShare) / totalFeeShare;
-    }
+    function getFees(uint256 _value) external view returns (uint256 creatorFee, uint256 registryFee) {
+        
+        registryFee = (_value * registryFeeShare) / totalFeeShare;
+        
+        creatorFee = _value - registryFee;
 
-    function getRegistryFee(uint256 _value) external view returns (uint256) {
-        return (_value * registryFeeShare) / totalFeeShare;
+        return (creatorFee, registryFee);
     }
 
     function getOwner() external view returns (address) {

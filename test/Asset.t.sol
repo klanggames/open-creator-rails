@@ -175,8 +175,7 @@ contract AssetTest is BaseTest {
 
         uint256 value = SUBSCRIPTION_PRICE * DURATION;
 
-        uint256 creatorFee = assetRegistry.getCreatorFee(value);
-        uint256 registryFee = assetRegistry.getRegistryFee(value);
+        (uint256 creatorFee, uint256 registryFee) = assetRegistry.getFees(value);
 
         assertEq(testToken.balanceOf(assetOwner), creatorBalance + creatorFee);
         assertEq(testToken.balanceOf(registryOwner), registryBalance + registryFee);

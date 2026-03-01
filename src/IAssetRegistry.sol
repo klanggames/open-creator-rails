@@ -71,15 +71,11 @@ interface IAssetRegistry {
     /// @param _registryFeeShare New registry fee share (used with totalFeeShare for percentage).
     function updateRegistryFeeShare(uint256 _registryFeeShare) external;
 
-    /// @notice Computes the creator portion of a payment value based on current fee shares.
+    /// @notice Returns the creator and registry fees for a given payment value.
     /// @param _value Total payment value.
-    /// @return Amount allocated to the creator.
-    function getCreatorFee(uint256 _value) external view returns (uint256);
-
-    /// @notice Computes the registry portion of a payment value based on current fee shares.
-    /// @param _value Total payment value.
-    /// @return Amount allocated to the registry.
-    function getRegistryFee(uint256 _value) external view returns (uint256);
+    /// @return creatorFee The creator fee.
+    /// @return registryFee The registry fee.
+    function getFees(uint256 _value) external view returns (uint256 creatorFee, uint256 registryFee);
 
     /// @notice Returns the owner of the registry (e.g. for receiving registry fees).
     /// @return The registry owner address.

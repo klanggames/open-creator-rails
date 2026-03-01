@@ -98,8 +98,9 @@ contract AssetRegistryTest is BaseTest {
         assetRegistry.updateRegistryFeeShare(20);
         vm.stopPrank();
 
-        assertEq(assetRegistry.getCreatorFee(100000000), 80000000);
-        assertEq(assetRegistry.getRegistryFee(100000000), 20000000);
+        (uint256 creatorFee, uint256 registryFee) = assetRegistry.getFees(100000000);
+        assertEq(creatorFee, 80000000);
+        assertEq(registryFee, 20000000);
     }
 
     function test_updateCreatorFeeShare_emitsEvent() public {
