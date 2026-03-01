@@ -162,8 +162,7 @@ All external functions for the registry and asset contracts, for use with JSON-R
 | `subscribe(bytes32 _assetId, address _owner, address _spender, uint256 _value, uint256 _deadline, uint8 _v, bytes32 _r, bytes32 _s)(uint256)` | write | anyone | Subscribes the given owner to the asset using ERC-2612 permit; forwards to the asset contract. Returns subscription expiry in Unix timestamp. | `_assetId` — Asset identifier.<br>`_owner` — Token owner and subscription beneficiary.<br>`_spender` — Must be the asset contract address for the permit.<br>`_value` — Permit allowance / payment amount.<br>`_deadline` — Permit signature expiry.<br>`_v` — Signature v.<br>`_r` — Signature r.<br>`_s` — Signature s. |
 | `updateCreatorFeeShare(uint256 _creatorFeeShare)()` | write | onlyOwner | Updates the creator's share of subscription fees. | `_creatorFeeShare` — New creator fee share (used with totalFeeShare for percentage). |
 | `updateRegistryFeeShare(uint256 _registryFeeShare)()` | write | onlyOwner | Updates the registry's share of subscription fees. | `_registryFeeShare` — New registry fee share (used with totalFeeShare for percentage). |
-| `getCreatorFee(uint256 _value)(uint256)` | read | anyone | Computes the creator portion of a payment value based on current fee shares. | `_value` — Total payment value. |
-| `getRegistryFee(uint256 _value)(uint256)` | read | anyone | Computes the registry portion of a payment value based on current fee shares. | `_value` — Total payment value. |
+| `getFees(uint256 _value)(uint256 creatorFee, uint256 registryFee)` | read | anyone | Returns the creator and registry fees for a given payment value. | `_value` — Total payment value. |
 | `getOwner()(address)` | read | anyone | Returns the owner of the registry (e.g. for receiving registry fees). | — |
 
 ---
