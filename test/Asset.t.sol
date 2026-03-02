@@ -41,7 +41,7 @@ contract AssetTest is BaseTest {
         (uint8 v, bytes32 r, bytes32 s) = getPermit(owner, spender, value, deadline);        
         
         vm.expectEmit(true, true, true, true);
-        emit Asset.SubscriptionAdded(owner, deadline);
+        emit Asset.SubscriptionAdded(owner, block.timestamp, deadline, 0);
 
         uint256 subscription = asset.subscribe(owner, spender, value, deadline, v, r, s);
         
@@ -72,10 +72,8 @@ contract AssetTest is BaseTest {
         vm.startPrank(assetOwner);
         vm.expectEmit(true, true, true, true);
         emit Asset.SubscriptionRevoked(signer);
-        bool success = asset.revokeSubscription(signer);
+        asset.revokeSubscription(signer);
         vm.stopPrank();
-
-        assertTrue(success);
 
         vm.startPrank(signer);
         assertEq(asset.getMySubscription(), 0);
@@ -161,10 +159,9 @@ contract AssetTest is BaseTest {
 
     function test_revokeSubscription_noSubscription() public {
         vm.startPrank(assetOwner);
-        bool success = asset.revokeSubscription(signer);
+        vm.expectRevert(Asset.SubscriptionNotFound.selector);
+        asset.revokeSubscription(signer);
         vm.stopPrank();
-
-        assertFalse(success);
     }
 
     function test_feeSplit() public {
