@@ -259,17 +259,90 @@ contract AssetTest is BaseTest {
 
         uint256 value = asset.getSubscriptionPrice(DURATION * 10);
 
+        assertEq(testToken.balanceOf(signer), tokenBalance - value);
+
         vm.startPrank(assetOwner);
         vm.expectEmit(true, true, true, true);
         emit Asset.SubscriptionRevoked(signer);
         asset.revokeSubscription(signer);
         vm.stopPrank();
 
-        assertEq(testToken.balanceOf(signer), tokenBalance - value);
+        assertEq(testToken.balanceOf(signer), tokenBalance);
 
         vm.startPrank(signer);
         assertEq(asset.getMySubscription(), 0);
         vm.stopPrank();
+    }
+
+    function test_revokeSubscription_midSubscription() public {
+        uint256 tokenBalance = testToken.balanceOf(signer);
+
+
+        uint256 count = 2;
+        for (uint256 i = 0; i < count; i++) {
+            _subscribe(DURATION);
+        }
+
+        uint256 value = asset.getSubscriptionPrice(DURATION);
+
+        vm.warp(block.timestamp + DURATION + (DURATION / 2));
+
+        vm.startPrank(assetOwner);
+        asset.revokeSubscription(signer);
+        vm.stopPrank();
+
+        assertEq(testToken.balanceOf(signer), tokenBalance - (value + (value / 2)));
+
+        vm.startPrank(signer);
+        assertEq(asset.getMySubscription(), block.timestamp);
+        vm.stopPrank();
+    }
+
+    function test_revokeSubscription_endOfSubscription() public {
+        uint256 tokenBalance = testToken.balanceOf(signer);
+
+        uint256 endTime = _subscribe(DURATION);
+
+        uint256 value = asset.getSubscriptionPrice(DURATION);
+
+        vm.warp(block.timestamp + DURATION);
+
+        vm.startPrank(assetOwner);
+        asset.revokeSubscription(signer);
+        vm.stopPrank();
+
+        assertEq(testToken.balanceOf(signer), tokenBalance - value);
+
+        vm.startPrank(signer);
+        assertEq(asset.getMySubscription(), block.timestamp);
+        vm.stopPrank();
+    }
+
+    function test_revokeSubscription_multiple_subscriptionPrice() public {
+        uint256 tokenBalance = testToken.balanceOf(signer);
+
+        _subscribe(DURATION);
+
+        uint256 value = asset.getSubscriptionPrice(DURATION);
+
+        vm.startPrank(assetOwner);
+        asset.setSubscriptionPrice(SUBSCRIPTION_PRICE * 2);
+        vm.stopPrank();
+
+        _subscribe(DURATION);
+
+        value += asset.getSubscriptionPrice(DURATION);
+
+        vm.startPrank(assetOwner);
+        asset.revokeSubscription(signer);
+        vm.stopPrank();
+
+        vm.startPrank(signer);
+        assertEq(asset.getMySubscription(), 0);
+        vm.stopPrank();
+
+        assertEq(value, DURATION * SUBSCRIPTION_PRICE * 3);
+        assertEq(testToken.balanceOf(signer), tokenBalance);
     }
 
     function test_viewSubscription() public {
