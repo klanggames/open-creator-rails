@@ -90,7 +90,8 @@ interface IAssetRegistry {
     /// @notice Claims the registry fee for a subscriber. Callable only by the Registry owner.
     /// @param _assetId Asset identifier.
     /// @param _subscriber Address whose registry fee to claim.
-    function claimRegistryFee(bytes32 _assetId, address _subscriber) external;
+    /// @return The amount of registry fee claimed.
+    function claimRegistryFee(bytes32 _assetId, address _subscriber) external returns (uint256);
 
     /// @notice Returns the owner of the registry (e.g. for receiving registry fees).
     /// @return The registry owner address.

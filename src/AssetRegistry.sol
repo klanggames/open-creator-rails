@@ -150,13 +150,15 @@ contract AssetRegistry is Ownable, IAssetRegistry {
         return (creatorFee, registryFee);
     }
 
-    function claimRegistryFee(bytes32 _assetId, address _subscriber) external onlyOwner {
+    function claimRegistryFee(bytes32 _assetId, address _subscriber) external onlyOwner returns (uint256 registryFee) {
         
         address asset = getAsset(_assetId);
         
-        uint256 registryFee = IAsset(asset).claimRegistryFee(_subscriber);
+        registryFee = IAsset(asset).claimRegistryFee(_subscriber);
 
         emit RegistryFeeClaimed(_subscriber, registryFee);
+
+        return registryFee;
     }
 
     function getOwner() external view returns (address) {
