@@ -150,6 +150,29 @@ contract AssetRegistryTest is BaseTest {
         assetRegistry.createAsset(ASSET_ID, SUBSCRIPTION_PRICE, address(testToken), address(0));
     }
 
+    function test_constructor_zeroTotalFeeShare() public {
+        vm.expectRevert(AssetRegistry.ZeroTotalFeeShare.selector);
+        new AssetRegistry(0, 0);
+    }
+
+    function test_updateCreatorFeeShare_zeroTotalFeeShare() public {
+        vm.prank(registryOwner);
+        assetRegistry.updateRegistryFeeShare(0);
+
+        vm.prank(registryOwner);
+        vm.expectRevert(AssetRegistry.ZeroTotalFeeShare.selector);
+        assetRegistry.updateCreatorFeeShare(0);
+    }
+
+    function test_updateRegistryFeeShare_zeroTotalFeeShare() public {
+        vm.prank(registryOwner);
+        assetRegistry.updateCreatorFeeShare(0);
+
+        vm.prank(registryOwner);
+        vm.expectRevert(AssetRegistry.ZeroTotalFeeShare.selector);
+        assetRegistry.updateRegistryFeeShare(0);
+    }
+
     function test_createAsset_invalidTokenAddress() public {
         vm.prank(registryOwner);
         vm.expectRevert(Asset.InvalidTokenAddress.selector);
