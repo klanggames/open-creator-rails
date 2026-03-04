@@ -37,12 +37,12 @@ interface IAsset {
 
     /// @notice Checks whether the caller has an active subscription (expiry > block.timestamp).
     /// @return True if the caller's subscription is active.
-    function viewMySubscription() external view returns (bool);
+    function isMySubscriptionActive() external view returns (bool);
 
     /// @notice Checks whether a user has an active subscription. Restricted to registry or asset owner.
     /// @param user Address to check.
     /// @return True if the user's subscription is active.
-    function viewSubscription(address user) external view returns (bool);
+    function isSubscriptionActive(address user) external view returns (bool);
 
     /// @notice Subscribes an owner using ERC-2612 permit: owner signs permit, then payment is pulled and subscription extended.
     /// @param owner Token owner and subscription beneficiary.

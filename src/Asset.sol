@@ -120,16 +120,16 @@ contract Asset is Ownable, ReentrancyGuard, IAsset {
         return _getSubscription(msg.sender);
     }
 
-    function _viewSubscription(address user) internal view returns (bool) {
+    function _isSubscriptionActive(address user) internal view returns (bool) {
         return _getSubscription(user) > block.timestamp;
     }
 
-    function viewMySubscription() external view returns (bool) {
-        return _viewSubscription(msg.sender);
+    function isMySubscriptionActive() external view returns (bool) {
+        return _isSubscriptionActive(msg.sender);
     }
 
-    function viewSubscription(address user) external onlyRegistryOrOwner view returns (bool) {
-        return _viewSubscription(user);
+    function isSubscriptionActive(address user) external onlyRegistryOrOwner view returns (bool) {
+        return _isSubscriptionActive(user);
     }
 
     function subscribe(address owner, address spender, uint256 value, uint256 deadline, uint8 v, bytes32 r, bytes32 s) external nonReentrant returns (uint256) {

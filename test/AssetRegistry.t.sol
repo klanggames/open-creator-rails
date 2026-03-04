@@ -73,14 +73,14 @@ contract AssetRegistryTest is BaseTest {
         assertEq(assetRegistry.getMySubscription(ASSET_ID), subscription);
     }
 
-    function test_viewSubscription() public {
+    function test_isMySubscriptionActive() public {
         test_createAsset();
         vm.prank(signer);
-        assertFalse(assetRegistry.viewMySubscription(ASSET_ID));
+        assertFalse(assetRegistry.isMySubscriptionActive(ASSET_ID));
 
         test_subscribe();
         vm.prank(signer);
-        assertTrue(assetRegistry.viewMySubscription(ASSET_ID));
+        assertTrue(assetRegistry.isMySubscriptionActive(ASSET_ID));
     }
 
     function test_getSubscription() public {
@@ -191,20 +191,20 @@ contract AssetRegistryTest is BaseTest {
         assetRegistry.updateRegistryFeeShare(20);
     }
 
-    function test_viewSubscription_withUser_ownerCanCall() public {
+    function test_isSubscriptionActive_withUser_ownerCanCall() public {
         test_createAsset();
         test_subscribe();
 
         vm.startPrank(registryOwner);
-        assertTrue(assetRegistry.viewSubscription(ASSET_ID, signer));
+        assertTrue(assetRegistry.isSubscriptionActive(ASSET_ID, signer));
         vm.stopPrank();
     }
 
-    function test_viewSubscription_withUser_unauthorized() public {
+    function test_isSubscriptionActive_withUser_unauthorized() public {
         test_createAsset();
         vm.prank(UNAUTHORIZED);
         vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, UNAUTHORIZED));
-        assetRegistry.viewSubscription(ASSET_ID, signer);
+        assetRegistry.isSubscriptionActive(ASSET_ID, signer);
     }
 
     function test_getSubscription_withUser_ownerCanCall() public {

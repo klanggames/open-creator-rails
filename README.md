@@ -187,7 +187,7 @@ All external functions for the registry and asset contracts, for use with JSON-R
 
 ---
 
-**viewMySubscription** : Checks whether the caller has an active subscription for the given asset.
+**isMySubscriptionActive** : Checks whether the caller has an active subscription for the given asset.
 - Type: read
 - Permission: none
 - Parameters:
@@ -198,7 +198,7 @@ All external functions for the registry and asset contracts, for use with JSON-R
 
 ---
 
-**viewSubscription** : Checks whether a user has an active subscription for the given asset.
+**isSubscriptionActive** : Checks whether a user has an active subscription for the given asset.
 - Type: read
 - Permission: `onlyOwner`
 - Parameters:
@@ -415,7 +415,7 @@ All external functions for the registry and asset contracts, for use with JSON-R
 
 ---
 
-**viewMySubscription** : Checks whether the caller has an active subscription (expiry > block.timestamp).
+**isMySubscriptionActive** : Checks whether the caller has an active subscription (expiry > block.timestamp).
 - Type: read
 - Permission: none
 - Parameters: none
@@ -425,7 +425,7 @@ All external functions for the registry and asset contracts, for use with JSON-R
 
 ---
 
-**viewSubscription** : Checks whether a user has an active subscription.
+**isSubscriptionActive** : Checks whether a user has an active subscription.
 - Type: read
 - Permission: `onlyRegistryOrOwner`
 - Parameters:

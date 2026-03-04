@@ -283,28 +283,28 @@ contract AssetTest is BaseTest {
         assertEq(testToken.balanceOf(signer), tokenBalance);
     }
 
-    function test_viewSubscription() public {
+    function test_isMySubscriptionActive() public {
         test_subscribe();
         vm.prank(signer);
-        assertTrue(asset.viewMySubscription());
+        assertTrue(asset.isMySubscriptionActive());
 
         vm.prank(assetOwner);
         asset.revokeSubscription(signer);
 
         vm.prank(signer);
-        assertFalse(asset.viewMySubscription());
+        assertFalse(asset.isMySubscriptionActive());
     }
 
-    function test_viewSubscription_cancelSubscription() public {
+    function test_isMySubscriptionActive_cancelSubscription() public {
         test_subscribe();
         vm.prank(signer);
-        assertTrue(asset.viewMySubscription());
+        assertTrue(asset.isMySubscriptionActive());
 
         vm.prank(signer);
         asset.cancelSubscription();
 
         vm.prank(signer);
-        assertFalse(asset.viewMySubscription());
+        assertFalse(asset.isMySubscriptionActive());
     }
 
     function test_unauthorized() public {
@@ -312,7 +312,7 @@ contract AssetTest is BaseTest {
         vm.expectRevert(Asset.OnlyRegistryOrOwnerUnauthorizedAccount.selector);
         asset.getSubscription(signer);
         vm.expectRevert(Asset.OnlyRegistryOrOwnerUnauthorizedAccount.selector);
-        asset.viewSubscription(signer);
+        asset.isSubscriptionActive(signer);
         vm.stopPrank();
     }
 

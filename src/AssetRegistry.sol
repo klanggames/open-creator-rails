@@ -68,21 +68,21 @@ contract AssetRegistry is Ownable, IAssetRegistry {
     /// @param _assetId Asset identifier.
     /// @param _user User address.
     /// @return True if the user's subscription for that asset is active.
-    function _viewSubscription(bytes32 _assetId, address _user) internal view returns (bool)
+    function _isSubscriptionActive(bytes32 _assetId, address _user) internal view returns (bool)
     {
         address asset = getAsset(_assetId);
 
-        return IAsset(asset).viewSubscription(_user);
+        return IAsset(asset).isSubscriptionActive(_user);
     }
     
-    function viewMySubscription(bytes32 _assetId) external view returns (bool)
+    function isMySubscriptionActive(bytes32 _assetId) external view returns (bool)
     {
-        return _viewSubscription(_assetId, msg.sender);
+        return _isSubscriptionActive(_assetId, msg.sender);
     }
 
-    function viewSubscription(bytes32 _assetId, address _user) external onlyOwner view returns (bool)
+    function isSubscriptionActive(bytes32 _assetId, address _user) external onlyOwner view returns (bool)
     {
-        return _viewSubscription(_assetId, _user);
+        return _isSubscriptionActive(_assetId, _user);
     }
 
     /// @notice Returns the subscription expiry timestamp for the given user for the given asset.
