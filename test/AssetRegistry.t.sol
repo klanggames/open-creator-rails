@@ -8,6 +8,23 @@ import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 
 contract AssetRegistryTest is BaseTest {
 
+    function _subscribe(uint256 duration) internal returns (uint256 subscription) {
+        test_createAsset();
+
+        address owner = signer;
+        address spender = address(asset);
+        uint256 value = asset.getSubscriptionPrice(duration);
+        uint256 deadline = block.timestamp + duration;
+
+        (uint8 v, bytes32 r, bytes32 s) = getPermit(owner, spender, value, deadline);
+
+        vm.startPrank(signer);
+        subscription = assetRegistry.subscribe(ASSET_ID, owner, spender, value, deadline, v, r, s);
+        vm.stopPrank();
+
+        return subscription;
+    }
+
     function setUp() public override {
         super.setUp();
 
@@ -62,13 +79,13 @@ contract AssetRegistryTest is BaseTest {
         test_createAsset();
         
         vm.startPrank(signer);
-        assertEq(assetRegistry.viewSubscription(ASSET_ID), false);
+        assertEq(assetRegistry.viewMySubscription(ASSET_ID), false);
         vm.stopPrank();
         
         test_subscribe();
         
         vm.startPrank(signer);
-        assertEq(assetRegistry.viewSubscription(ASSET_ID), true);
+        assertEq(assetRegistry.viewMySubscription(ASSET_ID), true);
         vm.stopPrank();
     }
 
@@ -76,13 +93,13 @@ contract AssetRegistryTest is BaseTest {
         test_createAsset();
 
         vm.startPrank(signer);
-        assertEq(assetRegistry.getSubscription(ASSET_ID), 0);
+        assertEq(assetRegistry.getMySubscription(ASSET_ID), 0);
         vm.stopPrank();
         
         test_subscribe();
         
         vm.startPrank(signer);
-        assertTrue(assetRegistry.getSubscription(ASSET_ID) > block.timestamp);
+        assertTrue(assetRegistry.getMySubscription(ASSET_ID) > block.timestamp);
         vm.stopPrank();
     }
 
@@ -198,5 +215,115 @@ contract AssetRegistryTest is BaseTest {
         vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, address(403)));
         assetRegistry.getSubscription(ASSET_ID, signer);
         vm.stopPrank();
+    }
+
+    function test_claimRegistryFee() public {
+        uint256 tokenBalance = testToken.balanceOf(registryOwner);
+        test_subscribe();
+
+        uint256 value = assetRegistry.getSubscriptionPrice(ASSET_ID, DURATION);
+        vm.warp(block.timestamp + DURATION);
+
+        vm.startPrank(registryOwner);
+        uint256 registryFee = assetRegistry.getRegistryFee(value);
+        vm.expectEmit(true, true, true, true);
+        emit AssetRegistry.RegistryFeeClaimed(signer, registryFee);
+        assetRegistry.claimRegistryFee(ASSET_ID, signer);
+        vm.stopPrank();
+
+        assertEq(testToken.balanceOf(registryOwner), tokenBalance + registryFee);
+    }
+
+    function test_claimRegistryFee_multiple() public {
+        uint256 tokenBalance = testToken.balanceOf(registryOwner);
+        uint256 count = 10;
+
+        for (uint256 i = 0; i < count; i++) {
+            _subscribe(DURATION);
+        }
+
+        vm.startPrank(signer);
+        uint256 endTime = assetRegistry.getMySubscription(ASSET_ID);
+        uint256 value = assetRegistry.getSubscriptionPrice(ASSET_ID, endTime - block.timestamp);
+        vm.stopPrank();
+
+        vm.warp(endTime);
+
+        vm.startPrank(registryOwner);
+        uint256 registryFee = assetRegistry.getRegistryFee(value);
+        vm.expectEmit(true, true, true, true);
+        emit AssetRegistry.RegistryFeeClaimed(signer, registryFee);
+        assetRegistry.claimRegistryFee(ASSET_ID, signer);
+        vm.stopPrank();
+
+        assertEq(testToken.balanceOf(registryOwner), tokenBalance + registryFee);
+    }
+
+    function test_claimRegistryFee_multiple_subscriptionPrice() public {
+        uint256 tokenBalance = testToken.balanceOf(registryOwner);
+
+        _subscribe(DURATION);
+
+        uint256 value = assetRegistry.getSubscriptionPrice(ASSET_ID, DURATION);
+
+        vm.startPrank(assetOwner);
+        asset.setSubscriptionPrice(SUBSCRIPTION_PRICE * 2);
+        vm.stopPrank();
+
+        uint256 endTime = _subscribe(DURATION);
+
+        value += assetRegistry.getSubscriptionPrice(ASSET_ID, DURATION);
+
+        uint256 registryFee = assetRegistry.getRegistryFee(value);
+
+        vm.warp(endTime);
+
+        vm.startPrank(registryOwner);
+        vm.expectEmit(true, true, true, true);
+        emit AssetRegistry.RegistryFeeClaimed(signer, registryFee);
+        assetRegistry.claimRegistryFee(ASSET_ID, signer);
+        vm.stopPrank();
+
+        assertEq(value, DURATION * SUBSCRIPTION_PRICE * 3);
+        assertEq(testToken.balanceOf(registryOwner), tokenBalance + registryFee);
+    }
+
+    function test_claimRegistryFee_midSubscription() public {
+        uint256 tokenBalance = testToken.balanceOf(registryOwner);
+        
+        _subscribe(DURATION);
+
+        uint256 value = assetRegistry.getSubscriptionPrice(ASSET_ID, DURATION);
+        vm.warp(block.timestamp + (DURATION / 2));
+
+        vm.startPrank(registryOwner);
+        uint256 registryFee = assetRegistry.getRegistryFee(value) / 2;
+        vm.expectEmit(true, true, true, true);
+        emit AssetRegistry.RegistryFeeClaimed(signer, registryFee);
+        assetRegistry.claimRegistryFee(ASSET_ID, signer);
+        vm.stopPrank();
+
+        assertEq(testToken.balanceOf(registryOwner), tokenBalance + registryFee);
+    }
+
+    function test_claimRegistryFee_startOfNextSubscription() public {
+        uint256 tokenBalance = testToken.balanceOf(registryOwner);
+
+        uint256 endTime = _subscribe(DURATION);
+
+        uint256 value = assetRegistry.getSubscriptionPrice(ASSET_ID,DURATION);
+
+        _subscribe(DURATION + 1);
+
+        vm.warp(endTime);
+
+        vm.startPrank(registryOwner);
+        uint256 registryFee = assetRegistry.getRegistryFee(value);
+        vm.expectEmit(true, true, true, true);
+        emit AssetRegistry.RegistryFeeClaimed(signer, registryFee);
+        assetRegistry.claimRegistryFee(ASSET_ID, signer);
+        vm.stopPrank();
+
+        assertEq(testToken.balanceOf(registryOwner), tokenBalance + registryFee);
     }
 }

@@ -26,7 +26,7 @@ interface IAssetRegistry {
     /// @notice Checks whether the caller has an active subscription for the given asset.
     /// @param _assetId Asset identifier.
     /// @return True if the caller's subscription for that asset is active.
-    function viewSubscription(bytes32 _assetId) external view returns (bool);
+    function viewMySubscription(bytes32 _assetId) external view returns (bool);
 
     /// @notice Checks whether a user has an active subscription for the given asset, restricted to registry owner.
     /// @param _assetId Asset identifier.
@@ -37,7 +37,7 @@ interface IAssetRegistry {
     /// @notice Returns the caller's subscription expiry timestamp for the given asset.
     /// @param _assetId Asset identifier.
     /// @return Expiry timestamp; 0 if no subscription.
-    function getSubscription(bytes32 _assetId) external view returns (uint256);
+    function getMySubscription(bytes32 _assetId) external view returns (uint256);
 
     /// @notice Returns the subscription expiry timestamp for the given user for the given asset, restricted to registry owner.
     /// @param _assetId Asset identifier.

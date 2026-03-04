@@ -75,7 +75,7 @@ contract AssetRegistry is Ownable, IAssetRegistry {
         return IAsset(asset).viewSubscription(_user);
     }
     
-    function viewSubscription(bytes32 _assetId) external view returns (bool)
+    function viewMySubscription(bytes32 _assetId) external view returns (bool)
     {
         return _viewSubscription(_assetId, msg.sender);
     }
@@ -96,7 +96,7 @@ contract AssetRegistry is Ownable, IAssetRegistry {
         return IAsset(asset).getSubscription(_user);
     }
 
-    function getSubscription(bytes32 _assetId) external view returns (uint256)
+    function getMySubscription(bytes32 _assetId) external view returns (uint256)
     {
         return _getSubscription(_assetId, msg.sender);
     }
