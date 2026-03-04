@@ -13,7 +13,7 @@ See the initial [MVP Architecture and Design](docs/mvp-design-and-architecture.m
 ### Prerequisites
 
 - [Foundry](https://book.getfoundry.sh/getting-started/installation) (forge, cast, anvil)
-- [jq](https://jqlang.org/) (optional) — for script usage (e.g. `get_address` in `script/utils.sh` reads `deployments.json` via jq)
+- [jq](https://jqlang.org/) (optional) — for script usage (e.g. `get_address` in `script/utils.sh` reads `registries_<chain_id>.json` via jq)
 
 ### Setup
 
