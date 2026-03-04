@@ -23,27 +23,17 @@ contract DeployForLocalIndexerTest is Script {
         console.log("GameToken deployed at:", address(gameToken));
 
         // 2. Deploy AssetRegistry (AssetContract in the indexer naming)
-        uint256 creatorFeeShare = 7000;
-        uint256 registryFeeShare = 3000;
-
-        AssetRegistry registry = new AssetRegistry(
-            creatorFeeShare,
-            registryFeeShare
-        );
+        AssetRegistry registry = new AssetRegistry(7000, 3000);
 
         console.log("AssetRegistry (AssetContract) deployed at:", address(registry));
 
         // 3. Create a Game Asset via createAsset
         bytes32 gameAssetId = bytes32(uint256(0x01)); // arbitrary id
-        uint256 subscriptionPrice = 1e18;             // 1 token (assuming 18 decimals)
-        address tokenAddress = address(gameToken);
-        address gameAssetOwner = deployer;
-
         address gameAssetAddress = registry.createAsset(
             gameAssetId,
-            subscriptionPrice,
-            tokenAddress,
-            gameAssetOwner
+            1e18,                // subscriptionPrice: 1 token (assuming 18 decimals)
+            address(gameToken),
+            deployer
         );
 
         console.log("GameAsset created with assetId:");
@@ -56,8 +46,7 @@ contract DeployForLocalIndexerTest is Script {
 
         // 3b. Update subscription price on the asset to emit SubscriptionPriceUpdated
         Asset gameAsset = Asset(gameAssetAddress);
-        uint256 newSubscriptionPrice = 2e18;
-        gameAsset.setSubscriptionPrice(newSubscriptionPrice);
+        gameAsset.setSubscriptionPrice(2e18);
 
         // 3c. Create a subscription via permit to emit SubscriptionAdded
         _subscribeViaPermit(gameToken, gameAsset, deployerKey, deployer, 10e18);
@@ -66,21 +55,21 @@ contract DeployForLocalIndexerTest is Script {
         bool revoked = gameAsset.revokeSubscription(deployer);
         console.log("SubscriptionRevoked emitted, success:", revoked);
 
+        // 3e. Create another subscription so that a current active subscription exists for indexing
+        _subscribeViaPermit(gameToken, gameAsset, deployerKey, deployer, 5e18);
+
         // 4. Sanity: retrieve the asset with getAsset
-        address lookedUpAsset = registry.getAsset(gameAssetId);
-        console.log("getAsset(gameAssetId) returned:", lookedUpAsset);
+        console.log("getAsset(gameAssetId) returned:", registry.getAsset(gameAssetId));
 
         // 5. Extra events for the indexer
 
         // 5a. OwnershipTransferred on the registry
-        address newRegistryOwner = address(0xBEEF);
-        registry.transferOwnership(newRegistryOwner);
-        console.log("Registry ownership transferred to:", newRegistryOwner);
+        registry.transferOwnership(address(0xBEEF));
+        console.log("Registry ownership transferred to:", address(0xBEEF));
 
         // 5b. OwnershipTransferred on the GameAsset
-        address newGameAssetOwner = address(0xCAFE);
-        gameAsset.transferOwnership(newGameAssetOwner);
-        console.log("GameAsset ownership transferred to:", newGameAssetOwner);
+        gameAsset.transferOwnership(address(0xCAFE));
+        console.log("GameAsset ownership transferred to:", address(0xCAFE));
 
         // (Optional extension)
         // If GameToken supports ERC20Permit and you want to emit SubscriptionAdded,
