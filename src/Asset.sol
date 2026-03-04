@@ -38,6 +38,9 @@ contract Asset is Ownable, ReentrancyGuard, IAsset {
         uint256 startTime;
         uint256 endTime;
         uint256 subscriptionPrice;
+        uint256 creatorFeeShare;
+        uint256 registryFeeShare;
+        uint256 totalFeeShare;
     }
 
     error InvalidOwner();
@@ -134,28 +137,12 @@ contract Asset is Ownable, ReentrancyGuard, IAsset {
 
     function subscribe(address owner, address spender, uint256 value, uint256 deadline, uint8 v, bytes32 r, bytes32 s) external nonReentrant returns (uint256) {
 
-        if (spender != address(this)) {
-            revert InvalidSpender();
-        }
-        
-        try TOKEN_PERMIT_CONTRACT.permit(owner, address(this), value, deadline, v, r, s) {
-            
-            value -= value % subscriptionPrice;
+        _valiatePermit(owner, spender, value, deadline, v, r, s);
 
-            if (value < subscriptionPrice) {
-                revert InsufficientFunds();
-            }
+        return _subscribe(owner, value);
+    }
 
-            bool success = TOKEN_CONTRACT.transferFrom(owner, address(this), value);
-
-            if (!success) {
-                revert SubscriptionFailed();
-            }
-        }
-        catch {
-            revert PermitFailed();
-        }
-
+    function _subscribe(address owner, uint256 value) internal returns (uint256) {
         uint256 duration = value / subscriptionPrice;
 
         uint256 startTime = block.timestamp;
@@ -178,13 +165,39 @@ contract Asset is Ownable, ReentrancyGuard, IAsset {
 
         uint256 endTime = startTime + duration;
 
-        subscriptions[id] = Subscription({startTime: startTime, endTime: endTime, subscriptionPrice: subscriptionPrice});
+        (uint256 creatorFeeShare, uint256 registryFeeShare, uint256 totalFeeShare) = ASSET_REGISTRY.getFeeShares();
+
+        subscriptions[id] = Subscription({startTime: startTime, endTime: endTime, subscriptionPrice: subscriptionPrice, creatorFeeShare: creatorFeeShare, registryFeeShare: registryFeeShare, totalFeeShare: totalFeeShare});
 
         subscribers.add(owner);
 
         emit SubscriptionAdded(owner, startTime, endTime, nonce);
 
         return endTime;
+    }
+
+    function _valiatePermit(address owner, address spender, uint256 value, uint256 deadline, uint8 v, bytes32 r, bytes32 s) internal {
+        if (spender != address(this)) {
+            revert InvalidSpender();
+        }
+        
+        try TOKEN_PERMIT_CONTRACT.permit(owner, address(this), value, deadline, v, r, s) {
+            
+            value -= value % subscriptionPrice;
+
+            if (value < subscriptionPrice) {
+                revert InsufficientFunds();
+            }
+
+            bool success = TOKEN_CONTRACT.transferFrom(owner, address(this), value);
+
+            if (!success) {
+                revert SubscriptionFailed();
+            }
+        }
+        catch {
+            revert PermitFailed();
+        }
     }
 
     function _claimable(address subscriber, uint256 claimedAt) internal view returns (uint256) {
@@ -213,7 +226,16 @@ contract Asset is Ownable, ReentrancyGuard, IAsset {
 
             uint256 endTime = Math.min(subscription.endTime, block.timestamp);
 
-            claimable += (endTime - startTime) * subscription.subscriptionPrice;
+            uint256 fee = (endTime - startTime) * subscription.subscriptionPrice;
+
+            uint256 registryFee = (fee * subscription.registryFeeShare) / subscription.totalFeeShare;
+
+            if (_isOwner()) {
+                claimable += (fee - registryFee);
+            }
+            else if (_isRegistry()) {
+                claimable += registryFee;
+            }
         }
 
         return claimable;
@@ -221,9 +243,7 @@ contract Asset is Ownable, ReentrancyGuard, IAsset {
 
     function claimCreatorFee(address subscriber) onlyOwner external nonReentrant returns (uint256 creatorFee) {
         
-        uint256 claimable = _claimable(subscriber, creatorClaimedAt[subscriber]);
-        
-        creatorFee = ASSET_REGISTRY.getCreatorFee(claimable);
+        creatorFee = _claimable(subscriber, creatorClaimedAt[subscriber]);
         
         bool success = TOKEN_CONTRACT.transfer(owner(), creatorFee);
 
@@ -240,9 +260,7 @@ contract Asset is Ownable, ReentrancyGuard, IAsset {
 
     function claimRegistryFee(address subscriber) onlyRegistry external nonReentrant returns (uint256 registryFee) {
         
-        uint256 claimable = _claimable(subscriber, registryClaimedAt[subscriber]);
-
-        registryFee = ASSET_REGISTRY.getRegistryFee(claimable);
+        registryFee = _claimable(subscriber, registryClaimedAt[subscriber]);
 
         bool success = TOKEN_CONTRACT.transfer(ASSET_REGISTRY.getOwner(), registryFee);
         
@@ -333,6 +351,14 @@ contract Asset is Ownable, ReentrancyGuard, IAsset {
             mstore(0x20, b)
             result := keccak256(0x00, 0x40)
         }
+    }
+
+    function _isOwner() internal view returns (bool) {
+        return msg.sender == owner();
+    }
+
+    function _isRegistry() internal view returns (bool) {
+        return msg.sender == REGISTRY_ADDRESS;
     }
 
      modifier onlyRegistry() {

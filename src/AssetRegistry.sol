@@ -120,6 +120,22 @@ contract AssetRegistry is Ownable, IAssetRegistry {
         return IAsset(asset).subscribe(_owner, _spender, _value, _deadline, _v, _r, _s);
     }
 
+    function getCreatorFeeShare() external view returns (uint256) {
+        return creatorFeeShare;
+    }
+
+    function getRegistryFeeShare() external view returns (uint256) {
+        return registryFeeShare;
+    }
+
+    function getTotalFeeShare() external view returns (uint256) {
+        return totalFeeShare;
+    }
+
+    function getFeeShares() external view returns (uint256, uint256, uint256) {
+        return (creatorFeeShare, registryFeeShare, totalFeeShare);
+    }
+
     function updateCreatorFeeShare(uint256 _creatorFeeShare) external onlyOwner {
         creatorFeeShare = _creatorFeeShare;
         totalFeeShare = creatorFeeShare + registryFeeShare;
