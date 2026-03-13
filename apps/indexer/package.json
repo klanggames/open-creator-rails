@@ -1,5 +1,5 @@
 {
-  "name": "ocr-indexer-ponder",
+  "name": "@open-creator-rails/indexer",
   "private": true,
   "type": "module",
   "scripts": {
