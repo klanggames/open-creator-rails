@@ -17,10 +17,7 @@ address=$(echo "$result" | jq -r '.deployedTo')
 
 chain_id=$(cast chain-id --rpc-url $RPC_URL)
 
-target_dir="packages/config/src/deployments"
-mkdir -p $target_dir
-
-file_name="$target_dir/token_addresses.json"
+file_name=$(get_token_addresses_file)
 
 if [ ! -f $file_name ]; then
     echo "{}" > $file_name
