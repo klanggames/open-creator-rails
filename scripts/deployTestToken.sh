@@ -4,9 +4,9 @@ if [ -f .env ]; then
     source .env
 fi
 
-source ./script/utils.sh
+source ./scripts/utils.sh
 
-result=$(./script/deploy.sh "TestToken")
+result=$(./scripts/deploy.sh "TestToken")
 EXIT_CODE=$?
 
 if [ $EXIT_CODE -ne 0 ]; then
