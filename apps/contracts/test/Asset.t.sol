@@ -176,18 +176,18 @@ contract AssetTest is BaseTest {
 
     function test_claimCreatorFee_multiple_creatorFeeShare() public {
         
-        (, uint256 registryFeeShare, uint256 totalFeeShare) = assetRegistry.getFeeShares();
+        uint256 registryFeeShare = assetRegistry.getRegistryFeeShare();
         uint256 tokenBalance = testToken.balanceOf(assetOwner);
 
         _subscribe(DURATION);
 
         vm.prank(registryOwner);
-        assetRegistry.updateCreatorFeeShare(60);
+        assetRegistry.updateRegistryFeeShare(40);
 
         uint256 endTime = _subscribe(DURATION);
 
         uint256 value = asset.getSubscriptionPrice(DURATION);
-        uint256 creatorFee = assetRegistry.getCreatorFee(value) + (value - ((value * registryFeeShare) / totalFeeShare));
+        uint256 creatorFee = assetRegistry.getCreatorFee(value) + (value - ((value * registryFeeShare) / 100));
         vm.warp(endTime);
 
         vm.prank(assetOwner);
@@ -198,7 +198,7 @@ contract AssetTest is BaseTest {
     }
 
     function test_claimCreatorFee_multiple_registryFeeShare() public {
-        (, uint256 registryFeeShare, uint256 totalFeeShare) = assetRegistry.getFeeShares();
+        uint256 registryFeeShare = assetRegistry.getRegistryFeeShare();
         uint256 tokenBalance = testToken.balanceOf(assetOwner);
 
         _subscribe(DURATION);
@@ -209,7 +209,7 @@ contract AssetTest is BaseTest {
         uint256 endTime = _subscribe(DURATION);
 
         uint256 value = asset.getSubscriptionPrice(DURATION);
-        uint256 creatorFee = assetRegistry.getCreatorFee(value) + (value - ((value * registryFeeShare) / totalFeeShare));
+        uint256 creatorFee = assetRegistry.getCreatorFee(value) + (value - ((value * registryFeeShare) / 100));
         vm.warp(endTime);
 
         vm.prank(assetOwner);

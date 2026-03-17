@@ -30,7 +30,7 @@ contract AssetRegistryTest is BaseTest {
         super.setUp();
 
         vm.startPrank(registryOwner);
-        assetRegistry = new AssetRegistry(70, 30);
+        assetRegistry = new AssetRegistry(30);
         vm.stopPrank();
     }
 
@@ -96,20 +96,12 @@ contract AssetRegistryTest is BaseTest {
 
     function test_updateFeeShare() public {
         vm.startPrank(registryOwner);
-        assetRegistry.updateCreatorFeeShare(80);
         assetRegistry.updateRegistryFeeShare(20);
         vm.stopPrank();
 
         (uint256 creatorFee, uint256 registryFee) = assetRegistry.getFees(100_000_000);
         assertEq(creatorFee, 80_000_000);
         assertEq(registryFee, 20_000_000);
-    }
-
-    function test_updateCreatorFeeShare_emitsEvent() public {
-        vm.prank(registryOwner);
-        vm.expectEmit(true, true, true, true);
-        emit AssetRegistry.CreatorFeeShareUpdated(80);
-        assetRegistry.updateCreatorFeeShare(80);
     }
 
     function test_updateRegistryFeeShare_emitsEvent() public {
@@ -145,27 +137,15 @@ contract AssetRegistryTest is BaseTest {
         assetRegistry.createAsset(ASSET_ID, SUBSCRIPTION_PRICE, address(testToken), address(0));
     }
 
-    function test_constructor_zeroTotalFeeShare() public {
-        vm.expectRevert(AssetRegistry.ZeroTotalFeeShare.selector);
-        new AssetRegistry(0, 0);
+    function test_constructor_registryFeeShareOutOfBounds() public {
+        vm.expectRevert(AssetRegistry.RegistryFeeShareOutOfBounds.selector);
+        new AssetRegistry(101);
     }
 
-    function test_updateCreatorFeeShare_zeroTotalFeeShare() public {
+    function test_updateRegistryFeeShare_registryFeeShareOutOfBounds() public {
         vm.prank(registryOwner);
-        assetRegistry.updateRegistryFeeShare(0);
-
-        vm.prank(registryOwner);
-        vm.expectRevert(AssetRegistry.ZeroTotalFeeShare.selector);
-        assetRegistry.updateCreatorFeeShare(0);
-    }
-
-    function test_updateRegistryFeeShare_zeroTotalFeeShare() public {
-        vm.prank(registryOwner);
-        assetRegistry.updateCreatorFeeShare(0);
-
-        vm.prank(registryOwner);
-        vm.expectRevert(AssetRegistry.ZeroTotalFeeShare.selector);
-        assetRegistry.updateRegistryFeeShare(0);
+        vm.expectRevert(AssetRegistry.RegistryFeeShareOutOfBounds.selector);
+        assetRegistry.updateRegistryFeeShare(101);
     }
 
     function test_createAsset_invalidTokenAddress() public {
@@ -195,12 +175,6 @@ contract AssetRegistryTest is BaseTest {
         vm.prank(UNAUTHORIZED);
         vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, UNAUTHORIZED));
         assetRegistry.createAsset(ASSET_ID, SUBSCRIPTION_PRICE, address(testToken), assetOwner);
-    }
-
-    function test_updateCreatorFeeShare_unauthorized() public {
-        vm.prank(UNAUTHORIZED);
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, UNAUTHORIZED));
-        assetRegistry.updateCreatorFeeShare(80);
     }
 
     function test_updateRegistryFeeShare_unauthorized() public {
@@ -260,18 +234,18 @@ contract AssetRegistryTest is BaseTest {
 
     function test_claimRegistryFee_multiple_creatorFeeShare() public {
         
-        (, uint256 registryFeeShare, uint256 totalFeeShare) = assetRegistry.getFeeShares();
+        uint256 registryFeeShare = assetRegistry.getRegistryFeeShare();
         uint256 tokenBalance = testToken.balanceOf(registryOwner);
 
         _subscribe(DURATION);
 
         vm.prank(registryOwner);
-        assetRegistry.updateCreatorFeeShare(60);
+        assetRegistry.updateRegistryFeeShare(40);
 
         uint256 endTime = _subscribe(DURATION);
 
         uint256 value = assetRegistry.getSubscriptionPrice(ASSET_ID, DURATION);
-        uint256 registryFee = assetRegistry.getRegistryFee(value) + ((value * registryFeeShare) / totalFeeShare);
+        uint256 registryFee = assetRegistry.getRegistryFee(value) + ((value * registryFeeShare) / 100);
         vm.warp(endTime);
 
         vm.prank(registryOwner);
@@ -282,7 +256,7 @@ contract AssetRegistryTest is BaseTest {
     }
 
     function test_claimRegistryFee_multiple_registryFeeShare() public {
-        (, uint256 registryFeeShare, uint256 totalFeeShare) = assetRegistry.getFeeShares();
+        uint256 registryFeeShare = assetRegistry.getRegistryFeeShare();
         uint256 tokenBalance = testToken.balanceOf(registryOwner);
 
         _subscribe(DURATION);
@@ -293,7 +267,7 @@ contract AssetRegistryTest is BaseTest {
         uint256 endTime = _subscribe(DURATION);
 
         uint256 value = assetRegistry.getSubscriptionPrice(ASSET_ID, DURATION);
-        uint256 registryFee = assetRegistry.getRegistryFee(value) + ((value * registryFeeShare) / totalFeeShare);
+        uint256 registryFee = assetRegistry.getRegistryFee(value) + ((value * registryFeeShare) / 100);
         vm.warp(endTime);
 
         vm.prank(registryOwner);
@@ -375,10 +349,6 @@ contract AssetRegistryTest is BaseTest {
 
     function test_getRegistryFeeShare() public view {
         assertEq(assetRegistry.getRegistryFeeShare(), 30);
-    }
-
-    function test_getTotalFeeShare() public view {
-        assertEq(assetRegistry.getTotalFeeShare(), 100);
     }
 
     function test_getCreatorFee() public view {

@@ -39,9 +39,7 @@ contract Asset is Ownable, ReentrancyGuard, IAsset {
         uint256 startTime;
         uint256 endTime;
         uint256 subscriptionPrice;
-        uint256 creatorFeeShare;
         uint256 registryFeeShare;
-        uint256 totalFeeShare;
         address payer;
     }
 
@@ -151,9 +149,9 @@ contract Asset is Ownable, ReentrancyGuard, IAsset {
 
         uint256 endTime = startTime + duration;
 
-        (uint256 creatorFeeShare, uint256 registryFeeShare, uint256 totalFeeShare) = ASSET_REGISTRY.getFeeShares();
+        uint256 registryFeeShare = ASSET_REGISTRY.getRegistryFeeShare();
 
-        subscriptions[id] = Subscription({startTime: startTime, endTime: endTime, subscriptionPrice: subscriptionPrice, creatorFeeShare: creatorFeeShare, registryFeeShare: registryFeeShare, totalFeeShare: totalFeeShare, payer: payer});
+        subscriptions[id] = Subscription({startTime: startTime, endTime: endTime, subscriptionPrice: subscriptionPrice, registryFeeShare: registryFeeShare, payer: payer});
 
         subscribers.add(subscriber);
 
@@ -216,7 +214,7 @@ contract Asset is Ownable, ReentrancyGuard, IAsset {
 
             uint256 fee = (endTime - startTime) * subscription.subscriptionPrice;
 
-            uint256 registryFee = (fee * subscription.registryFeeShare) / subscription.totalFeeShare;
+            uint256 registryFee = (fee * subscription.registryFeeShare) / 100;
 
             if (isOwner) {
                 claimable += (fee - registryFee);
