@@ -54,6 +54,7 @@ contract Asset is Ownable, ReentrancyGuard, IAsset {
     error OnlyRegistryUnauthorizedAccount();
 
     event SubscriptionAdded(bytes32 indexed subscriber, uint256 indexed startTime, uint256 indexed endTime, uint256 nonce, address payer);
+    event SubscriptionExtended(bytes32 indexed subscriber, uint256 indexed endTime);
     event CreatorFeeClaimed(bytes32 indexed subscriber, uint256 amount);
     event SubscriptionPriceUpdated(uint256 newSubscriptionPrice);
     event SubscriptionRevoked(bytes32 indexed subscriber);
@@ -127,6 +128,7 @@ contract Asset is Ownable, ReentrancyGuard, IAsset {
     }
 
     function _subscribe(bytes32 subscriber, address payer, uint256 value) internal returns (uint256) {
+        
         uint256 duration = value / subscriptionPrice;
 
         uint256 startTime = block.timestamp;
@@ -135,6 +137,8 @@ contract Asset is Ownable, ReentrancyGuard, IAsset {
 
         bytes32 id = _hash(subscriber, nonce);
 
+        uint256 registryFeeShare = ASSET_REGISTRY.getRegistryFeeShare();
+
         if (subscribers.contains(subscriber)) {
             
             Subscription memory subscription = subscriptions[id];
@@ -142,22 +146,40 @@ contract Asset is Ownable, ReentrancyGuard, IAsset {
             // If the previous subscription is still active, use the end time of the previous subscription's Expiry as the new Subscription's start time
             startTime = Math.max(startTime, subscription.endTime);
 
-            nonce = ++nonces[subscriber];
+            // Extend existing subscription if still active and subscription price, registry fee share, and payer are the same.
+            if (startTime < subscription.endTime
+                && subscription.payer == payer
+                && subscription.subscriptionPrice == subscriptionPrice
+                && subscription.registryFeeShare == registryFeeShare) {
+                
+                uint256 endTime = subscription.endTime + duration;
 
+                subscriptions[id].endTime = endTime;
+
+                emit SubscriptionExtended(subscriber, endTime);
+                
+                return endTime;
+            }
+
+            nonce = ++nonces[subscriber];
+            
             id = _hash(subscriber, nonce);
         }
 
-        uint256 endTime = startTime + duration;
+        return _addSubscription(id, nonce, subscriber, startTime, duration, registryFeeShare, payer);
+    }
 
-        uint256 registryFeeShare = ASSET_REGISTRY.getRegistryFeeShare();
+    function _addSubscription(bytes32 id, uint256 nonce, bytes32 subscriber, uint256 startTime, uint256 duration, uint256 registryFeeShare, address payer) internal returns (uint256) {
+            
+            uint256 endTime = startTime + duration;
 
-        subscriptions[id] = Subscription({startTime: startTime, endTime: endTime, subscriptionPrice: subscriptionPrice, registryFeeShare: registryFeeShare, payer: payer});
+            subscriptions[id] = Subscription({startTime: startTime, endTime: endTime, subscriptionPrice: subscriptionPrice, registryFeeShare: registryFeeShare, payer: payer});
 
-        subscribers.add(subscriber);
+            subscribers.add(subscriber);
 
-        emit SubscriptionAdded(subscriber, startTime, endTime, nonce, payer);
+            emit SubscriptionAdded(subscriber, startTime, endTime, nonce, payer);
 
-        return endTime;
+            return endTime;
     }
 
     function _validatePermit(address owner, address spender, uint256 value, uint256 deadline, uint8 v, bytes32 r, bytes32 s) internal {
