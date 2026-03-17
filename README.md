@@ -279,13 +279,13 @@ All external functions for the registry and asset contracts, for use with JSON-R
 
 ---
 
-**subscribe** : Subscribes a subscriber to the asset using ERC-2612 permit; forwards to the asset contract. The permit is signed by the token owner (payer); the subscription is attributed to `_subscriber` (payer and subscriber can differ).
+**subscribe** : Subscribes a subscriber to the asset using ERC-2612 permit; forwards to the asset contract. The permit is signed by the payer; the subscription is attributed to `_subscriber` (payer and subscriber can differ). The payer is the refund beneficiary on cancel/revoke.
 - Type: write
 - Permission: none
 - Parameters:
   - `bytes32 _assetId` : Asset identifier.
   - `bytes32 _subscriber` : Hash of the subscriber identity (who gets the access).
-  - `address _owner` : Token owner; signs the permit and pays. Can be the same or different from the subscriber (e.g. gifting).
+  - `address _payer` : Payer; signs the permit and pays. Receives refunds on cancel/revoke. Can be the same or different from the subscriber (e.g. gifting).
   - `address _spender` : Must be the asset contract address for the permit.
   - `uint256 _value` : Permit allowance / payment amount.
   - `uint256 _deadline` : Permit signature expiry.
@@ -493,12 +493,12 @@ All external functions for the registry and asset contracts, for use with JSON-R
 
 ---
 
-**subscribe** : Subscribes a subscriber using ERC-2612 permit: owner (payer) signs permit, then payment is pulled and subscription is attributed to the given subscriber. Payer and subscriber can differ (e.g. pay for someone else).
+**subscribe** : Subscribes a subscriber using ERC-2612 permit: payer signs permit, then payment is pulled and subscription is attributed to the given subscriber. Payer and subscriber can differ (e.g. pay for someone else). The payer is the refund beneficiary on cancel/revoke.
 - Type: write
 - Permission: none
 - Parameters:
   - `bytes32 subscriber` : Hash of the subscriber identity (who gets the access).
-  - `address owner` : Token owner; signs the permit and pays.
+  - `address payer` : Payer; signs the permit and pays. Receives refunds on cancel/revoke.
   - `address spender` : Must be this asset contract for the permit to be accepted.
   - `uint256 value` : Permit allowance / payment amount (will be rounded down to subscription price units).
   - `uint256 deadline` : Permit signature expiry.
@@ -543,11 +543,11 @@ All external functions for the registry and asset contracts, for use with JSON-R
 
 ---
 
-**cancelSubscription** : Cancels subscription(s) for the given subscriber. Caller must be the asset owner or the payer (owner) of each subscription being cancelled. The payer is entitled to a refund of the unearned portion (tokens are returned to the payer address).
+**cancelSubscription** : Cancels subscription(s) for the given subscriber. Caller must be the asset owner or the payer of each subscription being cancelled. The payer is entitled to a refund of the unearned portion (tokens are returned to the payer address).
 - Type: write
 - Permission: none
 - Parameters:
-  - `bytes32 subscriber` : Subscriber whose subscription to cancel (only entries owned by msg.sender or all if asset owner).
+  - `bytes32 subscriber` : Subscriber whose subscription to cancel (only entries whose payer is msg.sender, or all if asset owner).
 - Returns: void
 
 ---
@@ -608,7 +608,7 @@ All events emitted by the registry and asset contracts. Use for indexing, loggin
   - `uint256 indexed startTime` : Subscription start time (Unix timestamp).
   - `uint256 indexed endTime` : Subscription expiry time (Unix timestamp).
   - `uint256 nonce` : Subscription nonce.
-  - `address owner` : Token owner (payer) for this subscription.
+  - `address payer` : Payer for this subscription (refund beneficiary on cancel/revoke).
 
 
 ---
