@@ -128,7 +128,9 @@ contract Asset is Ownable, ReentrancyGuard, IAsset {
     }
 
     function _subscribe(bytes32 subscriber, address payer, uint256 value) internal returns (uint256) {
-        
+        // Purge the subscriber's subscriptions to remove any expired subscriptions
+        _purge(subscriber);
+
         uint256 duration = value / subscriptionPrice;
 
         uint256 startTime = block.timestamp;
@@ -147,8 +149,7 @@ contract Asset is Ownable, ReentrancyGuard, IAsset {
             startTime = Math.max(startTime, subscription.endTime);
 
             // Extend existing subscription if still active and subscription price, registry fee share, and payer are the same.
-            if (startTime < subscription.endTime
-                && subscription.payer == payer
+            if (subscription.payer == payer
                 && subscription.subscriptionPrice == subscriptionPrice
                 && subscription.registryFeeShare == registryFeeShare) {
                 
@@ -162,7 +163,7 @@ contract Asset is Ownable, ReentrancyGuard, IAsset {
             }
 
             nonce = ++nonces[subscriber];
-            
+
             id = _hash(subscriber, nonce);
         }
 
@@ -199,6 +200,42 @@ contract Asset is Ownable, ReentrancyGuard, IAsset {
         }
         catch {
             revert PermitFailed();
+        }
+    }
+
+    function _purge(bytes32 subscriber) internal {
+
+        if (!subscribers.contains(subscriber)) {
+            return;
+        }
+
+        uint256 nonce = nonces[subscriber];
+        
+        uint256 count = nonce + 1;
+
+        uint256 timestamp = block.timestamp;
+
+        uint256 deleted = 0;
+
+        for (uint256 i = 0; i < count; i++) {
+            
+            bytes32 id = _hash(subscriber, i);
+
+            Subscription memory subscription = subscriptions[id];
+
+            if (subscription.endTime <= timestamp) {
+                
+                delete subscriptions[id];
+                
+                deleted++;
+            }
+        }
+
+        if (deleted == count) {
+            // If the user has deleted all of their subscriptions, delete the nonce and remove the user from the subscribers set
+            delete nonces[subscriber];
+
+            subscribers.remove(subscriber);
         }
     }
 
