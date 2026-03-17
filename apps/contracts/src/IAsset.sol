@@ -72,7 +72,7 @@ interface IAsset {
     /// @param subscriber Subscriber whose subscription to revoke.
     function revokeSubscription(bytes32 subscriber) external;
 
-    /// @notice Cancels a subscriber's subscription. Callable only by the subscription owner.
+    /// @notice Cancels a subscriber's subscription. Callable by the asset owner or the subscription payer.
     /// @param subscriber Subscriber whose subscription to cancel.
     function cancelSubscription(bytes32 subscriber) external;
 }

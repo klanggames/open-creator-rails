@@ -24,16 +24,16 @@ contract AssetTest is BaseTest {
     }
 
     function _subscribe(uint256 duration) internal returns (uint256 subscription) {
-        address owner = signer;
+        address payer = signer;
         address spender = address(asset);
         
         uint256 value = asset.getSubscriptionPrice(duration);
 
         uint256 deadline = block.timestamp + duration;
         
-        (uint8 v, bytes32 r, bytes32 s) = getPermit(owner, spender, value, deadline);        
+        (uint8 v, bytes32 r, bytes32 s) = getPermit(payer, spender, value, deadline);        
 
-        subscription = asset.subscribe(SUBSCRIBER, owner, spender, value, deadline, v, r, s);
+        subscription = asset.subscribe(SUBSCRIBER, payer, spender, value, deadline, v, r, s);
         
         return subscription;
     }
@@ -349,18 +349,18 @@ contract AssetTest is BaseTest {
     }
 
     function test_subscribe_invalidSpender() public {
-        address owner = signer;
+        address payer = signer;
         address spender = address(1); // Wrong spender - must be address(asset)
         uint256 value = asset.getSubscriptionPrice(DURATION);
         uint256 deadline = block.timestamp + DURATION;
-        (uint8 v, bytes32 r, bytes32 s) = getPermit(owner, address(asset), value, deadline);
+        (uint8 v, bytes32 r, bytes32 s) = getPermit(payer, address(asset), value, deadline);
 
         vm.expectRevert(Asset.InvalidSpender.selector);
-        asset.subscribe(SUBSCRIBER, owner, spender, value, deadline, v, r, s);
+        asset.subscribe(SUBSCRIBER, payer, spender, value, deadline, v, r, s);
     }
 
     function test_subscribe_permitFailed() public {
-        address owner = signer;
+        address payer = signer;
         address spender = address(asset);
         uint256 value = asset.getSubscriptionPrice(DURATION);
         uint256 deadline = block.timestamp + DURATION;
@@ -368,18 +368,18 @@ contract AssetTest is BaseTest {
         (uint8 v, bytes32 r, bytes32 s) = (0, bytes32(0), bytes32(0));
 
         vm.expectRevert(Asset.PermitFailed.selector);
-        asset.subscribe(SUBSCRIBER, owner, spender, value, deadline, v, r, s);
+        asset.subscribe(SUBSCRIBER, payer, spender, value, deadline, v, r, s);
     }
 
     function test_subscribe_insufficientFunds() public {
-        address owner = signer;
+        address payer = signer;
         address spender = address(asset);
         uint256 value = SUBSCRIPTION_PRICE - 1; // Below subscriptionPrice, rounds to 0
         uint256 deadline = block.timestamp + DURATION;
-        (uint8 v, bytes32 r, bytes32 s) = getPermit(owner, spender, value, deadline);
+        (uint8 v, bytes32 r, bytes32 s) = getPermit(payer, spender, value, deadline);
 
         vm.expectRevert(Asset.InsufficientFunds.selector);
-        asset.subscribe(SUBSCRIBER, owner, spender, value, deadline, v, r, s);
+        asset.subscribe(SUBSCRIBER, payer, spender, value, deadline, v, r, s);
     }
 
     function test_setSubscriptionPrice_unauthorized() public {
@@ -542,14 +542,14 @@ contract AssetTest is BaseTest {
     }
 
     function test_subscribe_expiredDeadline() public {
-        address owner = signer;
+        address payer = signer;
         address spender = address(asset);
         uint256 value = asset.getSubscriptionPrice(DURATION);
         uint256 deadline = block.timestamp - 1;
-        (uint8 v, bytes32 r, bytes32 s) = getPermit(owner, spender, value, deadline);
+        (uint8 v, bytes32 r, bytes32 s) = getPermit(payer, spender, value, deadline);
 
         vm.expectRevert(Asset.PermitFailed.selector);
-        asset.subscribe(SUBSCRIBER, owner, spender, value, deadline, v, r, s);
+        asset.subscribe(SUBSCRIBER, payer, spender, value, deadline, v, r, s);
     }
 
     function test_claimCreatorFee_zeroClaimable() public {

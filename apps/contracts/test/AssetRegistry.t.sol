@@ -12,15 +12,15 @@ contract AssetRegistryTest is BaseTest {
     function _subscribe(uint256 duration) internal returns (uint256 subscription) {
         test_createAsset();
 
-        address owner = signer;
+        address payer = signer;
         address spender = address(asset);
         uint256 value = asset.getSubscriptionPrice(duration);
         uint256 deadline = block.timestamp + duration;
 
-        (uint8 v, bytes32 r, bytes32 s) = getPermit(owner, spender, value, deadline);
+        (uint8 v, bytes32 r, bytes32 s) = getPermit(payer, spender, value, deadline);
 
         vm.startPrank(signer);
-        subscription = assetRegistry.subscribe(ASSET_ID, SUBSCRIBER, owner, spender, value, deadline, v, r, s);
+        subscription = assetRegistry.subscribe(ASSET_ID, SUBSCRIBER, payer, spender, value, deadline, v, r, s);
         vm.stopPrank();
 
         return subscription;
@@ -60,13 +60,13 @@ contract AssetRegistryTest is BaseTest {
     function test_subscribe() public {
         test_createAsset();
 
-        address owner = signer;
+        address payer = signer;
         address spender = address(asset);
         uint256 value = asset.getSubscriptionPrice(DURATION);
         uint256 deadline = block.timestamp + DURATION;
-        (uint8 v, bytes32 r, bytes32 s) = getPermit(owner, spender, value, deadline);
+        (uint8 v, bytes32 r, bytes32 s) = getPermit(payer, spender, value, deadline);
 
-        uint256 subscription = assetRegistry.subscribe(ASSET_ID, SUBSCRIBER, owner, spender, value, deadline, v, r, s);
+        uint256 subscription = assetRegistry.subscribe(ASSET_ID, SUBSCRIBER, payer, spender, value, deadline, v, r, s);
 
         assertTrue(subscription > block.timestamp);
         assertEq(assetRegistry.getSubscription(ASSET_ID, SUBSCRIBER), subscription);
@@ -396,14 +396,14 @@ contract AssetRegistryTest is BaseTest {
 
     function test_subscribe_assetNotFound() public {
         bytes32 nonexistentId = keccak256("nonexistent");
-        address owner = signer;
+        address payer = signer;
         address spender = address(asset);
         uint256 value = asset.getSubscriptionPrice(DURATION);
         uint256 deadline = block.timestamp + DURATION;
-        (uint8 v, bytes32 r, bytes32 s) = getPermit(owner, spender, value, deadline);
+        (uint8 v, bytes32 r, bytes32 s) = getPermit(payer, spender, value, deadline);
 
         vm.expectRevert(AssetRegistry.AssetNotFound.selector);
-        assetRegistry.subscribe(nonexistentId, SUBSCRIBER, owner, spender, value, deadline, v, r, s);
+        assetRegistry.subscribe(nonexistentId, SUBSCRIBER, payer, spender, value, deadline, v, r, s);
     }
 
     function test_isSubscriptionActive_assetNotFound() public {

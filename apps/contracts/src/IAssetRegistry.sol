@@ -41,10 +41,10 @@ interface IAssetRegistry {
     /// @return Total price for the duration.
     function getSubscriptionPrice(bytes32 _assetId, uint256 _duration) external view returns (uint256);
 
-    /// @notice Subscribes the given owner to the asset using ERC-2612 permit; forwards to the asset contract.
+    /// @notice Subscribes a subscriber to the asset using ERC-2612 permit; forwards to the asset contract. The payer signs the permit and is the refund beneficiary on cancel/revoke.
     /// @param _assetId Asset identifier.
     /// @param _subscriber Hash of the subscriber identity.
-    /// @param _owner Token owner and subscription beneficiary.
+    /// @param _payer Payer; signs the permit and receives refunds on cancel/revoke.
     /// @param _spender Must be the asset contract address for the permit.
     /// @param _value Permit allowance / payment amount.
     /// @param _deadline Permit signature expiry.
@@ -52,7 +52,7 @@ interface IAssetRegistry {
     /// @param _r Signature r.
     /// @param _s Signature s.
     /// @return Subscription expiry in Unix timestamp.
-    function subscribe(bytes32 _assetId, bytes32 _subscriber, address _owner, address _spender, uint256 _value, uint256 _deadline, uint8 _v, bytes32 _r, bytes32 _s) external returns (uint256);
+    function subscribe(bytes32 _assetId, bytes32 _subscriber, address _payer, address _spender, uint256 _value, uint256 _deadline, uint8 _v, bytes32 _r, bytes32 _s) external returns (uint256);
 
     /// @notice Returns the creator fee share.
     /// @return creatorFeeShare The creator fee share.
