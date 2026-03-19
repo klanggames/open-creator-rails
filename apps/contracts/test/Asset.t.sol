@@ -5,6 +5,7 @@ import {BaseTest} from "./Base.t.sol";
 import {Asset} from "../src/Asset.sol";
 import {AssetRegistry} from "../src/AssetRegistry.sol";
 import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
+import {Vm} from "forge-std/Vm.sol";
 
 contract AssetTest is BaseTest {
     function test_getAssetId() public view {
@@ -764,10 +765,6 @@ contract AssetTest is BaseTest {
         uint256 registryOwnerBalanceBefore = testToken.balanceOf(registryOwner);
 
         vm.startPrank(address(assetRegistry));
-        vm.expectEmit(true, true, true, true);
-        emit AssetRegistry.RegistryFeeClaimed(SUBSCRIBER, registryFeePerSubscriber);
-        vm.expectEmit(true, true, true, true);
-        emit AssetRegistry.RegistryFeeClaimed(subscriber2, registryFeePerSubscriber);
         uint256 claimed = asset.claimRegistryFee(subs);
         vm.stopPrank();
 
@@ -824,5 +821,68 @@ contract AssetTest is BaseTest {
 
         assertEq(claimed, 0);
         assertEq(testToken.balanceOf(registryOwner), registryOwnerBalanceBefore);
+    }
+
+    // --- Expired subscription creates a new nonce (no in-place extension) ---
+
+    function test_subscribe_expiredSubscription_createsNewNonce() public {
+        uint256 endTime = _subscribe(DURATION);
+
+        // Let the subscription fully expire
+        vm.warp(endTime + 1);
+
+        // Re-subscribe with the same payer, price and fee share — since the subscription expired,
+        // startTime (block.timestamp) != subscription.endTime, so no in-place extension occurs.
+        uint256 newEnd = block.timestamp + DURATION;
+        vm.expectEmit(true, true, true, true);
+        emit Asset.SubscriptionAdded(SUBSCRIBER, block.timestamp, newEnd, 1, signer);
+        uint256 returnedEnd = _subscribe(DURATION);
+
+        assertEq(returnedEnd, newEnd);
+        assertEq(asset.getSubscription(SUBSCRIBER), newEnd);
+    }
+
+    // --- Claim tracking resets correctly after all subscriptions are revoked ---
+
+    function test_claimCreatorFee_afterRevokeAndResubscribe() public {
+        // Subscribe and immediately revoke: subscription hasn't elapsed so it is fully deleted
+        // (startTime == block.timestamp satisfies the "not yet started" branch in _removeSubscription).
+        // This also clears all claim-tracking state (creatorClaimedAtNonces/Timestamps, etc.).
+        _subscribe(DURATION);
+        vm.prank(assetOwner);
+        asset.revokeSubscription(SUBSCRIBER);
+        assertEq(asset.getSubscription(SUBSCRIBER), 0);
+
+        // Re-subscribe at a different price to prove claim tracking starts fresh with a new nonce 0.
+        vm.prank(assetOwner);
+        asset.setSubscriptionPrice(SUBSCRIPTION_PRICE * 2);
+        uint256 endTime = _subscribe(DURATION);
+        vm.warp(endTime);
+
+        uint256 value = asset.getSubscriptionPrice(DURATION);
+        uint256 expectedFee = assetRegistry.getCreatorFee(value);
+
+        vm.prank(assetOwner);
+        uint256 claimed = asset.claimCreatorFee(SUBSCRIBER);
+        assertEq(claimed, expectedFee);
+    }
+
+    function test_claimRegistryFee_afterRevokeAndResubscribe() public {
+        // Subscribe and immediately revoke for a clean full-deletion and tracking reset.
+        _subscribe(DURATION);
+        vm.prank(assetOwner);
+        asset.revokeSubscription(SUBSCRIBER);
+        assertEq(asset.getSubscription(SUBSCRIBER), 0);
+
+        // Re-subscribe from scratch; claim tracking must have been reset.
+        uint256 endTime = _subscribe(DURATION);
+        vm.warp(endTime);
+
+        uint256 value = asset.getSubscriptionPrice(DURATION);
+        uint256 expectedFee = assetRegistry.getRegistryFee(value);
+
+        vm.prank(address(assetRegistry));
+        uint256 claimed = asset.claimRegistryFee(SUBSCRIBER);
+        assertEq(claimed, expectedFee);
     }
 }

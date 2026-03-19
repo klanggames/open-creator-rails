@@ -17,7 +17,6 @@ contract AssetRegistry is Ownable, IAssetRegistry {
     error AssetAlreadyExists();
     error AssetNotFound();
     error RegistryFeeShareOutOfBounds();
-    error NotAuthorized();
 
     event AssetCreated(bytes32 indexed assetId, address indexed asset, uint256 subscriptionPrice, address tokenAddress, address indexed owner);
     event RegistryFeeShareUpdated(uint256 newRegistryFeeShare);

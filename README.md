@@ -413,18 +413,6 @@ All external functions for the registry and asset contracts, for use with JSON-R
 
 ---
 
-**emitRegistryFeeClaimed** : Emits a `RegistryFeeClaimed` event on behalf of an Asset contract. Callable only by the registered Asset contract for the given `_assetId` (used internally during batch fee claims).
-- Type: write
-- Permission: `onlyAsset`
-- Parameters:
-  - `bytes32 _assetId` : Asset identifier.
-  - `bytes32 _subscriber` : Subscriber identity for which the fee was claimed.
-  - `uint256 _registryFee` : Amount of registry fee claimed.
-- Returns: void
-
-
----
-
 **getOwner** : Returns the owner of the registry (e.g. for receiving registry fees).
 - Type: read
 - Permission: none
@@ -621,11 +609,21 @@ All events emitted by the registry and asset contracts. Use for indexing, loggin
 
 ---
 
-**RegistryFeeClaimed** : Emitted when the registry fee for a subscriber is claimed.
+**RegistryFeeClaimed** : Emitted when the registry fee for a single subscriber is claimed via the single-subscriber overload.
 - Contract: `AssetRegistry`
 - Parameters:
   - `bytes32 indexed subscriber` : Subscriber whose registry fee was claimed.
   - `uint256 amount` : Amount of registry fee claimed.
+
+
+---
+
+**RegistryFeeClaimedBatch** : Emitted when the registry fee is claimed for multiple subscribers in a single batch call. Emitted once per call regardless of how many subscribers had claimable fees.
+- Contract: `AssetRegistry`
+- Parameters:
+  - `bytes32 indexed assetId` : Asset identifier for which fees were claimed.
+  - `bytes32[] indexed subscribers` : Array of subscriber identities passed to the batch claim (note: as an indexed dynamic type, the topic is the keccak256 hash of the ABI-encoded array).
+  - `uint256 totalAmount` : Total registry fee claimed across all subscribers in the batch.
 
 
 ---
@@ -680,7 +678,7 @@ All events emitted by the registry and asset contracts. Use for indexing, loggin
 
 ---
 
-**SubscriptionCancelled** : Emitted when a subscriber's subscription is cancelled (by the payer or asset owner).
+**SubscriptionCancelled** : Emitted when a subscriber's subscription is cancelled by the registry contract.
 - Contract: `Asset`
 - Parameters:
   - `bytes32 indexed subscriber` : Subscriber whose subscription was cancelled.

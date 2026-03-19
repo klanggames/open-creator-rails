@@ -210,7 +210,7 @@ contract Asset is Ownable, ReentrancyGuard, IAsset {
         
         uint256 count = nonces[subscriber] + 1;
 
-        uint256 claimedNonce = claimedAtNonce;
+        claimedNonce = claimedAtNonce;
 
         for (uint256 i = claimedAtNonce; i < count; i++) {
             
@@ -401,7 +401,10 @@ contract Asset is Ownable, ReentrancyGuard, IAsset {
         // If the user has deleted all of their subscriptions, delete the nonce and remove the user from the subscribers set
         if (deleted == count) {
             delete nonces[subscriber];
-            delete claimedAtNonces[subscriber];
+            delete creatorClaimedAtNonces[subscriber];
+            delete creatorClaimedAtTimestamps[subscriber];
+            delete registryClaimedAtNonces[subscriber];
+            delete registryClaimedAtTimestamps[subscriber];
             subscribers.remove(subscriber);
         }
         // If the user has subscriptions left, decrement the nonce by the number of deleted subscriptions

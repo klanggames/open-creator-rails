@@ -439,10 +439,9 @@ contract AssetRegistryTest is BaseTest {
         uint256 registryOwnerBalanceBefore = testToken.balanceOf(registryOwner);
 
         vm.startPrank(registryOwner);
-        vm.expectEmit(true, true, true, true);
-        emit AssetRegistry.RegistryFeeClaimed(SUBSCRIBER, registryFeePerSubscriber);
-        vm.expectEmit(true, true, true, true);
-        emit AssetRegistry.RegistryFeeClaimed(subscriber2, registryFeePerSubscriber);
+        // Batch claims emit a single RegistryFeeClaimedBatch event (not per-subscriber RegistryFeeClaimed).
+        vm.expectEmit(true, false, false, true);
+        emit AssetRegistry.RegistryFeeClaimedBatch(ASSET_ID, subs, registryFeePerSubscriber * 2);
         uint256 claimed = assetRegistry.claimRegistryFee(ASSET_ID, subs);
         vm.stopPrank();
 
@@ -504,13 +503,56 @@ contract AssetRegistryTest is BaseTest {
         assetRegistry.cancelSubscription(nonexistentId, SUBSCRIBER);
     }
 
-    // --- emitRegistryFeeClaimed authorization ---
+    // --- RegistryFeeClaimedBatch event on batch claimRegistryFee ---
 
-    function test_emitRegistryFeeClaimed_notAuthorized() public {
-        test_createAsset();
+    function test_claimRegistryFee_batch_emitsRegistryFeeClaimedBatch() public {
+        bytes32 subscriber2 = keccak256("subscriber_2");
+        _subscribe(DURATION);
+        _subscribeFor(subscriber2, DURATION);
+        vm.warp(block.timestamp + DURATION);
 
-        vm.prank(UNAUTHORIZED);
-        vm.expectRevert(AssetRegistry.NotAuthorized.selector);
-        assetRegistry.emitRegistryFeeClaimed(ASSET_ID, SUBSCRIBER, 100);
+        bytes32[] memory subs = new bytes32[](2);
+        subs[0] = SUBSCRIBER;
+        subs[1] = subscriber2;
+
+        uint256 value = assetRegistry.getSubscriptionPrice(ASSET_ID, DURATION);
+        uint256 totalFee = assetRegistry.getRegistryFee(value) * 2;
+
+        vm.prank(registryOwner);
+        vm.expectEmit(true, true, true, true);
+        emit AssetRegistry.RegistryFeeClaimedBatch(ASSET_ID, subs, totalFee);
+        assetRegistry.claimRegistryFee(ASSET_ID, subs);
     }
+
+    function test_claimRegistryFee_batch_emitsRegistryFeeClaimedBatch_zeroFee() public {
+        _subscribe(DURATION);
+
+        bytes32[] memory subs = new bytes32[](1);
+        subs[0] = SUBSCRIBER;
+
+        // Nothing is claimable yet — totalAmount should be 0.
+        vm.prank(registryOwner);
+        vm.expectEmit(true, true, true, true);
+        emit AssetRegistry.RegistryFeeClaimedBatch(ASSET_ID, subs, 0);
+        uint256 claimed = assetRegistry.claimRegistryFee(ASSET_ID, subs);
+
+        assertEq(claimed, 0);
+    }
+
+    // --- Expired subscription creates a new nonce (integration via registry) ---
+
+    function test_subscribe_expiredSubscription_createsNewNonce_viaRegistry() public {
+        uint256 endTime = _subscribe(DURATION);
+
+        vm.warp(endTime + 1);
+
+        // Re-subscribe with same terms after expiry — should produce a new nonce, not extend.
+        uint256 newEnd = block.timestamp + DURATION;
+        vm.expectEmit(true, true, true, true);
+        emit Asset.SubscriptionAdded(SUBSCRIBER, block.timestamp, newEnd, 1, signer);
+        _subscribe(DURATION);
+
+        assertEq(assetRegistry.getSubscription(ASSET_ID, SUBSCRIBER), newEnd);
+    }
+
 }
