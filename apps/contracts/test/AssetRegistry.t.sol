@@ -26,6 +26,23 @@ contract AssetRegistryTest is BaseTest {
         return subscription;
     }
 
+    function _subscribeFor(bytes32 subscriber, uint256 duration) internal returns (uint256 subscription) {
+        test_createAsset();
+
+        address payer = signer;
+        address spender = address(asset);
+        uint256 value = asset.getSubscriptionPrice(duration);
+        uint256 deadline = block.timestamp + duration;
+
+        (uint8 v, bytes32 r, bytes32 s) = getPermit(payer, spender, value, deadline);
+
+        vm.startPrank(signer);
+        subscription = assetRegistry.subscribe(ASSET_ID, subscriber, payer, spender, value, deadline, v, r, s);
+        vm.stopPrank();
+
+        return subscription;
+    }
+
     function setUp() public override {
         super.setUp();
 
@@ -393,5 +410,107 @@ contract AssetRegistryTest is BaseTest {
         vm.prank(registryOwner);
         vm.expectRevert(AssetRegistry.AssetNotFound.selector);
         assetRegistry.claimRegistryFee(nonexistentId, SUBSCRIBER);
+    }
+
+    // --- getFeeShares ---
+
+    function test_getFeeShares() public view {
+        (uint256 creatorFeeShare, uint256 registryFeeShare) = assetRegistry.getFeeShares();
+        assertEq(creatorFeeShare, 70);
+        assertEq(registryFeeShare, 30);
+        assertEq(creatorFeeShare + registryFeeShare, 100);
+    }
+
+    // --- Batch claimRegistryFee ---
+
+    function test_claimRegistryFee_batch() public {
+        bytes32 subscriber2 = keccak256("subscriber_2");
+        _subscribe(DURATION);
+        _subscribeFor(subscriber2, DURATION);
+
+        uint256 value = assetRegistry.getSubscriptionPrice(ASSET_ID, DURATION);
+        uint256 registryFeePerSubscriber = assetRegistry.getRegistryFee(value);
+        vm.warp(block.timestamp + DURATION);
+
+        bytes32[] memory subs = new bytes32[](2);
+        subs[0] = SUBSCRIBER;
+        subs[1] = subscriber2;
+
+        uint256 registryOwnerBalanceBefore = testToken.balanceOf(registryOwner);
+
+        vm.startPrank(registryOwner);
+        vm.expectEmit(true, true, true, true);
+        emit AssetRegistry.RegistryFeeClaimed(SUBSCRIBER, registryFeePerSubscriber);
+        vm.expectEmit(true, true, true, true);
+        emit AssetRegistry.RegistryFeeClaimed(subscriber2, registryFeePerSubscriber);
+        uint256 claimed = assetRegistry.claimRegistryFee(ASSET_ID, subs);
+        vm.stopPrank();
+
+        assertEq(claimed, registryFeePerSubscriber * 2);
+        assertEq(testToken.balanceOf(registryOwner), registryOwnerBalanceBefore + claimed);
+    }
+
+    function test_claimRegistryFee_batch_unauthorized() public {
+        _subscribe(DURATION);
+        vm.warp(block.timestamp + DURATION);
+
+        bytes32[] memory subs = new bytes32[](1);
+        subs[0] = SUBSCRIBER;
+
+        vm.prank(UNAUTHORIZED);
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, UNAUTHORIZED));
+        assetRegistry.claimRegistryFee(ASSET_ID, subs);
+    }
+
+    function test_claimRegistryFee_batch_assetNotFound() public {
+        bytes32 nonexistentId = keccak256("nonexistent");
+
+        bytes32[] memory subs = new bytes32[](1);
+        subs[0] = SUBSCRIBER;
+
+        vm.prank(registryOwner);
+        vm.expectRevert(AssetRegistry.AssetNotFound.selector);
+        assetRegistry.claimRegistryFee(nonexistentId, subs);
+    }
+
+    // --- cancelSubscription ---
+
+    function test_cancelSubscription() public {
+        uint256 tokenBalanceBefore = testToken.balanceOf(signer);
+        _subscribe(DURATION);
+
+        assertEq(testToken.balanceOf(signer), tokenBalanceBefore - asset.getSubscriptionPrice(DURATION));
+
+        vm.prank(registryOwner);
+        assetRegistry.cancelSubscription(ASSET_ID, SUBSCRIBER);
+
+        assertFalse(assetRegistry.isSubscriptionActive(ASSET_ID, SUBSCRIBER));
+        assertEq(testToken.balanceOf(signer), tokenBalanceBefore);
+    }
+
+    function test_cancelSubscription_unauthorized() public {
+        _subscribe(DURATION);
+
+        vm.prank(UNAUTHORIZED);
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, UNAUTHORIZED));
+        assetRegistry.cancelSubscription(ASSET_ID, SUBSCRIBER);
+    }
+
+    function test_cancelSubscription_assetNotFound() public {
+        bytes32 nonexistentId = keccak256("nonexistent");
+
+        vm.prank(registryOwner);
+        vm.expectRevert(AssetRegistry.AssetNotFound.selector);
+        assetRegistry.cancelSubscription(nonexistentId, SUBSCRIBER);
+    }
+
+    // --- emitRegistryFeeClaimed authorization ---
+
+    function test_emitRegistryFeeClaimed_notAuthorized() public {
+        test_createAsset();
+
+        vm.prank(UNAUTHORIZED);
+        vm.expectRevert(AssetRegistry.NotAuthorized.selector);
+        assetRegistry.emitRegistryFeeClaimed(ASSET_ID, SUBSCRIBER, 100);
     }
 }
