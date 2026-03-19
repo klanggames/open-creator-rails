@@ -120,6 +120,13 @@ jobs:
         run: npm install -g @railway/cli
 
       # ----------------------------------------------------------------
+      # 3b. Link to Railway project
+      # ----------------------------------------------------------------
+      - name: Link Railway project
+        run: |
+          railway link --project "$PROJECT_ID" --environment production --service "$API_SERVICE_ID"
+
+      # ----------------------------------------------------------------
       # 4. Determine which worker slot to target
       # ----------------------------------------------------------------
       - name: Determine target slot
