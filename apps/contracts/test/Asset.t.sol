@@ -61,7 +61,11 @@ contract AssetTest is BaseTest {
 
         for (uint256 i = 0; i < count; i++) {
             vm.expectEmit(true, true, true, true);
-            emit Asset.SubscriptionAdded(SUBSCRIBER, deadline, deadline + DURATION, i, signer);
+            if (i == 0) {
+                emit Asset.SubscriptionAdded(SUBSCRIBER, deadline, deadline + DURATION, i, signer);
+            } else {
+                emit Asset.SubscriptionExtended(SUBSCRIBER, deadline + DURATION);
+            }
             _subscribe(DURATION);
             deadline += DURATION;
         }
@@ -341,7 +345,7 @@ contract AssetTest is BaseTest {
         vm.prank(signer);
         assertTrue(asset.isSubscriptionActive(SUBSCRIBER));
 
-        vm.prank(signer);
+        vm.prank(address(assetRegistry));
         asset.cancelSubscription(SUBSCRIBER);
 
         vm.prank(signer);
@@ -407,7 +411,7 @@ contract AssetTest is BaseTest {
 
         assertEq(testToken.balanceOf(signer), tokenBalance - asset.getSubscriptionPrice(DURATION));
 
-        vm.prank(signer);
+        vm.prank(address(assetRegistry));
         vm.expectEmit(true, true, true, true);
         emit Asset.SubscriptionCancelled(SUBSCRIBER);
         asset.cancelSubscription(SUBSCRIBER);
@@ -422,7 +426,7 @@ contract AssetTest is BaseTest {
 
         assertEq(testToken.balanceOf(signer), tokenBalance - asset.getSubscriptionPrice(DURATION * 10));
 
-        vm.prank(signer);
+        vm.prank(address(assetRegistry));
         vm.expectEmit(true, true, true, true);
         emit Asset.SubscriptionCancelled(SUBSCRIBER);
         asset.cancelSubscription(SUBSCRIBER);
@@ -438,7 +442,7 @@ contract AssetTest is BaseTest {
         uint256 value = asset.getSubscriptionPrice(DURATION);
         vm.warp(block.timestamp + DURATION + (DURATION / 2));
 
-        vm.prank(signer);
+        vm.prank(address(assetRegistry));
         asset.cancelSubscription(SUBSCRIBER);
 
         assertEq(testToken.balanceOf(signer), tokenBalance - (value + (value / 2)));
@@ -450,7 +454,7 @@ contract AssetTest is BaseTest {
         _subscribe(DURATION);
 
         vm.warp(block.timestamp + DURATION);
-        vm.prank(signer);
+        vm.prank(address(assetRegistry));
         asset.cancelSubscription(SUBSCRIBER);
 
         assertEq(testToken.balanceOf(signer), tokenBalance - asset.getSubscriptionPrice(DURATION));
@@ -465,7 +469,7 @@ contract AssetTest is BaseTest {
         asset.setSubscriptionPrice(SUBSCRIPTION_PRICE * 2);
         _subscribe(DURATION);
 
-        vm.prank(signer);
+        vm.prank(address(assetRegistry));
         asset.cancelSubscription(SUBSCRIBER);
 
         assertEq(asset.getSubscription(SUBSCRIBER), 0);
@@ -473,22 +477,21 @@ contract AssetTest is BaseTest {
     }
 
     function test_cancelSubscription_noSubscription() public {
-        vm.prank(signer);
+        vm.prank(address(assetRegistry));
         vm.expectRevert(Asset.SubscriptionNotFound.selector);
         asset.cancelSubscription(SUBSCRIBER);
     }
 
     function test_cancelSubscription_unauthorized() public {
         uint256 tokenBalance = testToken.balanceOf(signer);
-        uint256 tokenBalanceUnauthorized = testToken.balanceOf(UNAUTHORIZED);
         
         test_subscribe();
         
         vm.prank(UNAUTHORIZED);
+        vm.expectRevert(Asset.OnlyRegistryUnauthorizedAccount.selector);
         asset.cancelSubscription(SUBSCRIBER);
 
         assertEq(testToken.balanceOf(signer), tokenBalance - asset.getSubscriptionPrice(DURATION));
-        assertEq(testToken.balanceOf(UNAUTHORIZED), tokenBalanceUnauthorized);
     }
 
     function test_claimCreatorFee_unauthorized() public {

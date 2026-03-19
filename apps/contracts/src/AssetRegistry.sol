@@ -140,6 +140,13 @@ contract AssetRegistry is Ownable, IAssetRegistry {
         return registryFee;
     }
 
+    function cancelSubscription(bytes32 _assetId, bytes32 _subscriber) external onlyOwner {
+        
+        address asset = getAsset(_assetId);
+
+        IAsset(asset).cancelSubscription(_subscriber);
+    }
+
     function getOwner() external view returns (address) {
         return this.owner();
     }

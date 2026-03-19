@@ -28,8 +28,10 @@ contract Asset is Ownable, ReentrancyGuard, IAsset {
     mapping(bytes32 => Subscription) internal subscriptions;
     mapping(bytes32 => uint256) internal nonces;
 
-    mapping(bytes32 => uint256) internal creatorClaimedAt;
-    mapping(bytes32 => uint256) internal registryClaimedAt;
+    mapping(bytes32 => uint256) internal creatorClaimedAtTimestamps;
+    mapping(bytes32 => uint256) internal creatorClaimedAtNonces;
+    mapping(bytes32 => uint256) internal registryClaimedAtTimestamps;
+    mapping(bytes32 => uint256) internal registryClaimedAtNonces;
 
     EnumerableSet.Bytes32Set internal subscribers;
 
@@ -128,9 +130,7 @@ contract Asset is Ownable, ReentrancyGuard, IAsset {
     }
 
     function _subscribe(bytes32 subscriber, address payer, uint256 value) internal returns (uint256) {
-        // Purge the subscriber's subscriptions to remove any expired subscriptions
-        _purge(subscriber);
-
+        
         uint256 duration = value / subscriptionPrice;
 
         uint256 startTime = block.timestamp;
@@ -203,55 +203,15 @@ contract Asset is Ownable, ReentrancyGuard, IAsset {
         }
     }
 
-    function _purge(bytes32 subscriber) internal {
-
-        if (!subscribers.contains(subscriber)) {
-            return;
-        }
-
-        uint256 nonce = nonces[subscriber];
+    function _claimable(bytes32 subscriber, uint256 claimedAtTimestamp, uint256 claimedAtNonce) internal view returns (uint256 claimable, uint256 claimedNonce) {
         
-        uint256 count = nonce + 1;
-
-        uint256 timestamp = block.timestamp;
-
-        uint256 deleted = 0;
-
-        for (uint256 i = 0; i < count; i++) {
-            
-            bytes32 id = _hash(subscriber, i);
-
-            Subscription memory subscription = subscriptions[id];
-
-            if (subscription.endTime <= timestamp) {
-                
-                delete subscriptions[id];
-                
-                deleted++;
-            }
-        }
-
-        if (deleted == count) {
-            // If the user has deleted all of their subscriptions, delete the nonce and remove the user from the subscribers set
-            delete nonces[subscriber];
-
-            subscribers.remove(subscriber);
-        }
-    }
-
-    function _claimable(bytes32 subscriber, uint256 claimedAt) internal view returns (uint256) {
-        
-        uint256 nonce = nonces[subscriber];
-        
-        uint256 claimable = 0;
-
         bool isOwner = _isOwner();
 
         bool isRegistry = _isRegistry();
 
-        uint256 count = nonce + 1;
+        uint256 count = nonces[subscriber] + 1;
 
-        for (uint256 i = 0; i < count; i++) {
+        for (uint256 i = claimedAtNonce; i < count; i++) {
             
             bytes32 id = _hash(subscriber, i);
             
@@ -263,11 +223,13 @@ contract Asset is Ownable, ReentrancyGuard, IAsset {
             }
 
             // If the subscription has already been claimed, continue to the next subscription
-            if (subscription.endTime <= claimedAt) {
+            if (subscription.endTime <= claimedAtTimestamp) {
                 continue;
             }
 
-            uint256 startTime = Math.max(subscription.startTime, claimedAt);
+            claimedNonce = i;
+
+            uint256 startTime = Math.max(subscription.startTime, claimedAtTimestamp);
 
             uint256 endTime = Math.min(subscription.endTime, block.timestamp);
 
@@ -283,16 +245,16 @@ contract Asset is Ownable, ReentrancyGuard, IAsset {
             }
         }
 
-        return claimable;
+        return (claimable, claimedNonce);
     }
 
     function claimCreatorFee(bytes32 subscriber) onlyOwner external nonReentrant returns (uint256 creatorFee) {
         
-        creatorFee = _claimable(subscriber, creatorClaimedAt[subscriber]);
+        (creatorFee, creatorClaimedAtNonces[subscriber]) = _claimable(subscriber, creatorClaimedAtTimestamps[subscriber], creatorClaimedAtNonces[subscriber]);
         
         SafeERC20.safeTransfer(TOKEN_CONTRACT, owner(), creatorFee);
 
-        creatorClaimedAt[subscriber] = block.timestamp;
+        creatorClaimedAtTimestamps[subscriber] = block.timestamp;
 
         emit CreatorFeeClaimed(subscriber, creatorFee);
 
@@ -300,12 +262,12 @@ contract Asset is Ownable, ReentrancyGuard, IAsset {
     }
 
     function claimRegistryFee(bytes32 subscriber) onlyRegistry external nonReentrant returns (uint256 registryFee) {
-        
-        registryFee = _claimable(subscriber, registryClaimedAt[subscriber]);
+
+        (registryFee, registryClaimedAtNonces[subscriber]) = _claimable(subscriber, registryClaimedAtTimestamps[subscriber], registryClaimedAtNonces[subscriber]);
 
         SafeERC20.safeTransfer(TOKEN_CONTRACT, ASSET_REGISTRY.getOwner(), registryFee);
 
-        registryClaimedAt[subscriber] = block.timestamp;
+        registryClaimedAtTimestamps[subscriber] = block.timestamp;
 
         return registryFee;
     }
@@ -320,23 +282,19 @@ contract Asset is Ownable, ReentrancyGuard, IAsset {
 
         uint256 deleted = 0;
 
-        bool isOwner = _isOwner();
-
         uint256 count = nonce + 1;
-
-        address caller = msg.sender;
 
         uint256 timestamp = block.timestamp;
 
-        for (uint256 i = 0; i < count; i++) {
+        for (uint256 i = count; i > 0; i--) {
             
-            bytes32 id = _hash(subscriber, i);
+            bytes32 id = _hash(subscriber, i - 1);
             
             Subscription memory subscription = subscriptions[id];
 
-            // If caller isn't the assetowner or subscription payer, continue to the next subscription
-            if (!isOwner && subscription.payer != caller) {
-                continue;
+            // If the subscription has already expired, break the loop since all subsequent subscriptions will also have expired
+            if (subscription.endTime <= timestamp) {
+                break;
             }
 
             uint256 returnable = 0;
@@ -365,7 +323,7 @@ contract Asset is Ownable, ReentrancyGuard, IAsset {
 
         // If the user has deleted all of their subscriptions, delete the nonce and remove the user from the subscribers set
         if (deleted == count) {
-            delete nonces[subscriber];    
+            delete nonces[subscriber];
             subscribers.remove(subscriber);
         }
         // If the user has subscriptions left, decrement the nonce by the number of deleted subscriptions
@@ -380,7 +338,7 @@ contract Asset is Ownable, ReentrancyGuard, IAsset {
         emit SubscriptionRevoked(subscriber);
     }
 
-    function cancelSubscription(bytes32 subscriber) external nonReentrant {
+    function cancelSubscription(bytes32 subscriber) external onlyRegistry nonReentrant {
         _removeSubscription(subscriber);
         
         emit SubscriptionCancelled(subscriber);
