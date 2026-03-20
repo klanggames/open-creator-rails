@@ -62,22 +62,13 @@ interface IAssetRegistry {
     /// @return registryFeeShare The registry fee share.
     function getRegistryFeeShare() external view returns (uint256);
 
-    /// @notice Returns the total fee share.
-    /// @return totalFeeShare The total fee share.
-    function getTotalFeeShare() external view returns (uint256);
-
     /// @notice Returns the creator and registry fee shares.
     /// @return creatorFeeShare The creator fee share.
     /// @return registryFeeShare The registry fee share.
-    /// @return totalFeeShare The total fee share.
-    function getFeeShares() external view returns (uint256 creatorFeeShare, uint256 registryFeeShare, uint256 totalFeeShare);
-
-    /// @notice Updates the creator's share of subscription fees. Callable only by registry owner.
-    /// @param _creatorFeeShare New creator fee share (used with totalFeeShare for percentage).
-    function updateCreatorFeeShare(uint256 _creatorFeeShare) external;
+    function getFeeShares() external view returns (uint256 creatorFeeShare, uint256 registryFeeShare);
 
     /// @notice Updates the registry's share of subscription fees. Callable only by registry owner.
-    /// @param _registryFeeShare New registry fee share (used with totalFeeShare for percentage).
+    /// @param _registryFeeShare New registry fee share (0 - 100).
     function updateRegistryFeeShare(uint256 _registryFeeShare) external;
 
     /// @notice Returns the creator fee for a given payment value.
@@ -101,6 +92,17 @@ interface IAssetRegistry {
     /// @param _subscriber Hash of the subscriber identity.
     /// @return The amount of registry fee claimed.
     function claimRegistryFee(bytes32 _assetId, bytes32 _subscriber) external returns (uint256);
+
+    /// @notice Claims the registry fee for multiple subscribers. Callable only by the Registry owner.
+    /// @param _assetId Asset identifier.
+    /// @param _subscribers Array of subscriber identities.
+    /// @return The amount of registry fee claimed.
+    function claimRegistryFee(bytes32 _assetId, bytes32[] calldata _subscribers) external returns (uint256);
+
+    /// @notice Cancels a subscription. Callable only by the Registry owner.
+    /// @param _assetId Asset identifier.
+    /// @param _subscriber Hash of the subscriber identity.
+    function cancelSubscription(bytes32 _assetId, bytes32 _subscriber) external;
 
     /// @notice Returns the owner of the registry (e.g. for receiving registry fees).
     /// @return The registry owner address.

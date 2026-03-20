@@ -67,24 +67,23 @@ See the initial [MVP Architecture and Design](docs/mvp-design-and-architecture.m
 
 ### Deploying Registries
 
-Deploy an AssetRegistry with the specified fee shares:
+Deploy an AssetRegistry with the specified registry fee share:
 
 ```bash
-./scripts/deployRegistry.sh <creator_fee_share> <registry_fee_share>
+./scripts/deployRegistry.sh <registry_fee_share>
 ```
 
 | Input | Description |
 |-------|--------------|
-| `creator_fee_share` | Share of subscription payments allocated to asset creators. Numerator for the split. |
-| `registry_fee_share` | Share of subscription payments allocated to the registry. Numerator for the split. |
+| `registry_fee_share` | Percentage of subscription payments allocated to the registry. Must be 0–100. The creator receives the remainder (`100 - registry_fee_share`). |
 
 Example:
 
 ```bash
-./scripts/deployRegistry.sh 80 20
+./scripts/deployRegistry.sh 20
 ```
 
-Deployments are recorded in `packages/config/src/deployments/registries_<chain_id>.json`, where `chain_id` is the chain ID of the network from `RPC_URL` (e.g. `registries_11155111.json` for Sepolia, `registries_84532.json` for Base Sepolia). The file is an array of registry objects with `address`, `creatorFeeShare`, `registryFeeShare`, `owner`, and `assets`.
+Deployments are recorded in `packages/config/src/deployments/registries_<chain_id>.json`, where `chain_id` is the chain ID of the network from `RPC_URL` (e.g. `registries_11155111.json` for Sepolia, `registries_84532.json` for Base Sepolia). The file is an array of registry objects with `address`, `registryFeeShare`, `owner`, and `assets`.
 
 ### Creating Assets
 
@@ -304,63 +303,42 @@ All external functions for the registry and asset contracts, for use with JSON-R
 
 ---
 
-**getCreatorFeeShare** : Returns the creator fee share.
+**getCreatorFeeShare** : Returns the creator fee share percentage. Computed as `100 - registryFeeShare`.
 - Type: read
 - Permission: none
 - Parameters: none
 - Returns:
-  - `uint256` : Creator fee share.
+  - `uint256` : Creator fee share (0–100).
 
 
 ---
 
-**getRegistryFeeShare** : Returns the registry fee share.
+**getRegistryFeeShare** : Returns the registry fee share percentage.
 - Type: read
 - Permission: none
 - Parameters: none
 - Returns:
-  - `uint256` : Registry fee share.
+  - `uint256` : Registry fee share (0–100).
 
 
 ---
 
-**getTotalFeeShare** : Returns the total fee share.
+**getFeeShares** : Returns the creator and registry fee shares. They always sum to 100.
 - Type: read
 - Permission: none
 - Parameters: none
 - Returns:
-  - `uint256` : Total fee share.
+  - `uint256 creatorFeeShare` : Creator fee share (0–100).
+  - `uint256 registryFeeShare` : Registry fee share (0–100).
 
 
 ---
 
-**getFeeShares** : Returns the creator and registry fee shares.
-- Type: read
-- Permission: none
-- Parameters: none
-- Returns:
-  - `uint256 creatorFeeShare` : Creator fee share.
-  - `uint256 registryFeeShare` : Registry fee share.
-  - `uint256 totalFeeShare` : Total fee share.
-
-
----
-
-**updateCreatorFeeShare** : Updates the creator's share of subscription fees.
+**updateRegistryFeeShare** : Updates the registry's share of subscription fees. The creator share is automatically `100 - _registryFeeShare`.
 - Type: write
 - Permission: `onlyOwner`
 - Parameters:
-  - `uint256 _creatorFeeShare` : New creator fee share (used with totalFeeShare for percentage).
-- Returns: void
-
-
----
-
-**updateRegistryFeeShare** : Updates the registry's share of subscription fees.
-- Type: write
-- Permission: `onlyOwner`
-- Parameters:
-  - `uint256 _registryFeeShare` : New registry fee share (used with totalFeeShare for percentage).
+  - `uint256 _registryFeeShare` : New registry fee share percentage (0–100). Reverts if out of bounds.
 - Returns: void
 
 
@@ -400,7 +378,7 @@ All external functions for the registry and asset contracts, for use with JSON-R
 
 ---
 
-**claimRegistryFee** : Claims the registry fee for a subscriber.
+**claimRegistryFee** (single) : Claims the registry fee for a single subscriber.
 - Type: write
 - Permission: `onlyOwner`
 - Parameters:
@@ -408,6 +386,29 @@ All external functions for the registry and asset contracts, for use with JSON-R
   - `bytes32 _subscriber` : Hash of the subscriber identity whose registry fee to claim.
 - Returns:
   - `uint256` : Amount of registry fee claimed.
+
+
+---
+
+**claimRegistryFee** (batch) : Claims the registry fee for multiple subscribers in a single call. Subscribers with no accrued fee are silently skipped.
+- Type: write
+- Permission: `onlyOwner`
+- Parameters:
+  - `bytes32 _assetId` : Asset identifier.
+  - `bytes32[] _subscribers` : Array of subscriber identity hashes to claim for.
+- Returns:
+  - `uint256` : Total amount of registry fee claimed across all subscribers.
+
+
+---
+
+**cancelSubscription** : Cancels a subscriber's subscription via the registry. Callable only by the registry owner. Unearned subscription value is refunded to the original payer.
+- Type: write
+- Permission: `onlyOwner`
+- Parameters:
+  - `bytes32 _assetId` : Asset identifier.
+  - `bytes32 _subscriber` : Hash of the subscriber identity whose subscription to cancel.
+- Returns: void
 
 
 ---
@@ -517,7 +518,7 @@ All external functions for the registry and asset contracts, for use with JSON-R
 
 ---
 
-**claimCreatorFee** : Claims the creator fee for a subscriber.
+**claimCreatorFee** (single) : Claims the creator fee for a single subscriber.
 - Type: write
 - Permission: `onlyOwner`
 - Parameters:
@@ -528,7 +529,18 @@ All external functions for the registry and asset contracts, for use with JSON-R
 
 ---
 
-**claimRegistryFee** : Claims the registry fee for a subscriber. Callable only by the registry contract.
+**claimCreatorFee** (batch) : Claims the creator fee for multiple subscribers in a single call. Subscribers with no accrued fee or no subscription are silently skipped.
+- Type: write
+- Permission: `onlyOwner`
+- Parameters:
+  - `bytes32[] subscribers` : Array of subscriber identity hashes to claim for.
+- Returns:
+  - `uint256` : Total amount of creator fee claimed across all subscribers.
+
+
+---
+
+**claimRegistryFee** (single) : Claims the registry fee for a single subscriber. Callable only by the registry contract.
 - Type: write
 - Permission: `onlyRegistry`
 - Parameters:
@@ -539,7 +551,18 @@ All external functions for the registry and asset contracts, for use with JSON-R
 
 ---
 
-**revokeSubscription** : Revokes a subscriber's subscription (e.g. all entries for that subscriber). The payer of each subscription is entitled to a refund of the unearned portion (tokens are returned to the payer address).
+**claimRegistryFee** (batch) : Claims the registry fee for multiple subscribers in a single call. Callable only by the registry contract. Subscribers with no accrued fee or no subscription are silently skipped.
+- Type: write
+- Permission: `onlyRegistry`
+- Parameters:
+  - `bytes32[] subscribers` : Array of subscriber identity hashes to claim for.
+- Returns:
+  - `uint256` : Total amount of registry fee claimed across all subscribers.
+
+
+---
+
+**revokeSubscription** : Revokes a subscriber's subscription. The payer of each subscription is entitled to a refund of the unearned portion (tokens are returned to the payer address).
 - Type: write
 - Permission: `onlyOwner`
 - Parameters:
@@ -549,11 +572,11 @@ All external functions for the registry and asset contracts, for use with JSON-R
 
 ---
 
-**cancelSubscription** : Cancels subscription(s) for the given subscriber. Caller must be the asset owner or the payer of each subscription being cancelled. The payer is entitled to a refund of the unearned portion (tokens are returned to the payer address).
+**cancelSubscription** : Cancels a subscriber's subscription. Callable only by the registry contract. The payer of each subscription is entitled to a refund of the unearned portion (tokens are returned to the payer address).
 - Type: write
-- Permission: none
+- Permission: `onlyRegistry`
 - Parameters:
-  - `bytes32 subscriber` : Subscriber whose subscription to cancel (only entries whose payer is msg.sender, or all if asset owner).
+  - `bytes32 subscriber` : Subscriber whose subscription to cancel.
 - Returns: void
 
 ---
@@ -578,14 +601,6 @@ All events emitted by the registry and asset contracts. Use for indexing, loggin
 
 ---
 
-**CreatorFeeShareUpdated** : Emitted when the creator fee share is updated.
-- Contract: `AssetRegistry`
-- Parameters:
-  - `uint256 newCreatorFeeShare` : New creator fee share.
-
-
----
-
 **RegistryFeeShareUpdated** : Emitted when the registry fee share is updated.
 - Contract: `AssetRegistry`
 - Parameters:
@@ -594,7 +609,7 @@ All events emitted by the registry and asset contracts. Use for indexing, loggin
 
 ---
 
-**RegistryFeeClaimed** : Emitted when the registry fee for a subscriber is claimed.
+**RegistryFeeClaimed** : Emitted when the registry fee for a single subscriber is claimed via the single-subscriber overload.
 - Contract: `AssetRegistry`
 - Parameters:
   - `bytes32 indexed subscriber` : Subscriber whose registry fee was claimed.
@@ -603,18 +618,37 @@ All events emitted by the registry and asset contracts. Use for indexing, loggin
 
 ---
 
+**RegistryFeeClaimedBatch** : Emitted when the registry fee is claimed for multiple subscribers in a single batch call. Emitted once per call regardless of how many subscribers had claimable fees.
+- Contract: `AssetRegistry`
+- Parameters:
+  - `bytes32 indexed assetId` : Asset identifier for which fees were claimed.
+  - `bytes32[] indexed subscribers` : Array of subscriber identities passed to the batch claim (note: as an indexed dynamic type, the topic is the keccak256 hash of the ABI-encoded array).
+  - `uint256 totalAmount` : Total registry fee claimed across all subscribers in the batch.
+
+
+---
+
 ### Asset
 
 ---
 
-**SubscriptionAdded** : Emitted when a subscriber subscribes or extends their subscription.
+**SubscriptionAdded** : Emitted when a new subscription record is created for a subscriber (new nonce). This happens on the first subscription and whenever the payer, subscription price, or registry fee share differs from the active subscription. For renewals that extend an existing active subscription under the same terms, see `SubscriptionExtended`.
 - Contract: `Asset`
 - Parameters:
   - `bytes32 indexed subscriber` : Subscriber identity (hash).
   - `uint256 indexed startTime` : Subscription start time (Unix timestamp).
   - `uint256 indexed endTime` : Subscription expiry time (Unix timestamp).
-  - `uint256 nonce` : Subscription nonce.
+  - `uint256 nonce` : Subscription nonce (increments each time a new record is created for the subscriber).
   - `address payer` : Payer for this subscription (refund beneficiary on cancel/revoke).
+
+
+---
+
+**SubscriptionExtended** : Emitted when an active subscription is extended under the same terms (same payer, subscription price, and registry fee share). The existing subscription record's `endTime` is updated in place; no new nonce is created.
+- Contract: `Asset`
+- Parameters:
+  - `bytes32 indexed subscriber` : Subscriber identity (hash).
+  - `uint256 indexed endTime` : Updated subscription expiry time (Unix timestamp).
 
 
 ---
@@ -644,7 +678,7 @@ All events emitted by the registry and asset contracts. Use for indexing, loggin
 
 ---
 
-**SubscriptionCancelled** : Emitted when a subscriber's subscription is cancelled (by the payer or asset owner).
+**SubscriptionCancelled** : Emitted when a subscriber's subscription is cancelled by the registry contract.
 - Contract: `Asset`
 - Parameters:
   - `bytes32 indexed subscriber` : Subscriber whose subscription was cancelled.

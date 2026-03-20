@@ -6,12 +6,11 @@ fi
 
 source ./scripts/utils.sh
 
-creator_fee_share=$1
-registry_fee_share=$2
+registry_fee_share=$1
 
-shift 2
+shift 1
 
-result=$(./scripts/deploy.sh "AssetRegistry" $creator_fee_share $registry_fee_share)
+result=$(./scripts/deploy.sh "AssetRegistry" $registry_fee_share)
 EXIT_CODE=$?
 
 if [ $EXIT_CODE -ne 0 ]; then
@@ -26,14 +25,12 @@ deployments_file=$(get_deployments_file)
 
 # Add the new deployment to the deployments file
 jq --arg address "$address" \
-   --argjson creatorFeeShare "$creator_fee_share" \
    --argjson registryFeeShare "$registry_fee_share" \
    --arg owner "$owner" \
-   '. += [{address: $address, creatorFeeShare: $creatorFeeShare, registryFeeShare: $registryFeeShare, owner: $owner, assets: []}]' \
+   '. += [{address: $address, registryFeeShare: $registryFeeShare, owner: $owner, assets: []}]' \
    "$deployments_file" > tmp.json && mv tmp.json "$deployments_file"
 
 echo "AssetRegistry: $address
 Details:
   Owner: $owner
-  Creator Fee Share: $creator_fee_share
   Registry Fee Share: $registry_fee_share"

@@ -57,16 +57,25 @@ interface IAsset {
         bytes32 s
     ) external returns (uint256);
 
-
     /// @notice Claims the creator fee for a user. Callable only by the asset owner.
     /// @param subscriber Hash of the subscriber identity whose creator fee to claim.
     /// @return The amount of creator fee claimed.
     function claimCreatorFee(bytes32 subscriber) external returns (uint256);
 
+    /// @notice Claims the creator fee for multiple users. Callable only by the asset owner.
+    /// @param subscribers Array of subscriber identities whose creator fee to claim.
+    /// @return The amount of creator fee claimed.
+    function claimCreatorFee(bytes32[] calldata subscribers) external returns (uint256);
+
     /// @notice Claims the registry fee for a user. Callable only by the Registry owner.
     /// @param subscriber Hash of the subscriber identity whose registry fee to claim.
     /// @return The amount of registry fee claimed.
     function claimRegistryFee(bytes32 subscriber) external returns (uint256);
+
+    /// @notice Claims the registry fee for multiple users. Callable only by the Registry owner.
+    /// @param subscribers Array of subscriber identities whose registry fee to claim.
+    /// @return The amount of registry fee claimed.
+    function claimRegistryFee(bytes32[] calldata subscribers) external returns (uint256);
 
     /// @notice Revokes a subscriber's subscription. Callable only by the asset owner.
     /// @param subscriber Subscriber whose subscription to revoke.
