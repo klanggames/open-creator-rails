@@ -4,9 +4,11 @@ import {
   Subscription, 
   AssetRegistry_AssetCreated,
   AssetRegistry_OwnershipTransferred,
-  AssetRegistry_CreatorFeeShareUpdated,
   AssetRegistry_RegistryFeeShareUpdated,
+  AssetRegistry_RegistryFeeClaimedBatch,
   Asset_SubscriptionAdded,
+  Asset_SubscriptionExtended,
+  Asset_CreatorFeeClaimed,
   Asset_SubscriptionRevoked,
   Asset_SubscriptionCancelled,
   Asset_SubscriptionPriceUpdated,
@@ -60,20 +62,21 @@ ponder.on("AssetRegistry:OwnershipTransferred", async ({ event, context }) => {
   });
 });
 
-ponder.on("AssetRegistry:CreatorFeeShareUpdated", async ({ event, context }) => {
-  await context.db.insert(AssetRegistry_CreatorFeeShareUpdated).values({
+ponder.on("AssetRegistry:RegistryFeeShareUpdated", async ({ event, context }) => {
+  await context.db.insert(AssetRegistry_RegistryFeeShareUpdated).values({
     id: getEventId(event),
-    newCreatorFeeShare: event.args.newCreatorFeeShare,
+    newRegistryFeeShare: event.args.newRegistryFeeShare,
     registryAddress: event.log.address,
     blockNumber: event.block.number,
     blockTimestamp: event.block.timestamp,
   });
 });
 
-ponder.on("AssetRegistry:RegistryFeeShareUpdated", async ({ event, context }) => {
-  await context.db.insert(AssetRegistry_RegistryFeeShareUpdated).values({
+ponder.on("AssetRegistry:RegistryFeeClaimedBatch", async ({ event, context }) => {
+  await context.db.insert(AssetRegistry_RegistryFeeClaimedBatch).values({
     id: getEventId(event),
-    newRegistryFeeShare: event.args.newRegistryFeeShare,
+    assetId: event.args.assetId,
+    totalAmount: event.args.totalAmount,
     registryAddress: event.log.address,
     blockNumber: event.block.number,
     blockTimestamp: event.block.timestamp,
@@ -92,14 +95,15 @@ ponder.on("Asset:SubscriptionAdded", async ({ event, context }) => {
 
   const id = `${assetAddress}_${subscriber}`;
   
-  // Fetch existing subscription to accurately conditionally update startTime
+  // Fetch existing subscription to preserve continuity of startTime
   const existingSub = await context.db.find(Subscription, { id });
 
   let computedStartTime = event.args.startTime;
 
-  // If the subscriber previously had a subscription, and they topped up while it was still active,
-  // the contract rigidly sets the new event's startTime to equal the previous subscription's endTime.
-  // We check for this exact match to safely preserve their original unbroken start time.
+  // When the contract creates a new nonce (terms changed mid-subscription),
+  // it sets startTime = previous subscription's endTime, chaining them seamlessly.
+  // We detect this and preserve the original startTime to show unbroken continuity.
+  // Pure extensions (same terms) are handled by SubscriptionExtended instead.
   if (existingSub && existingSub.endTime === event.args.startTime) {
     computedStartTime = existingSub.startTime;
   }
@@ -131,6 +135,37 @@ ponder.on("Asset:SubscriptionAdded", async ({ event, context }) => {
     endTime: event.args.endTime,
     nonce: event.args.nonce,
     assetAddress: assetAddress,
+    blockNumber: event.block.number,
+    blockTimestamp: event.block.timestamp,
+  });
+});
+
+ponder.on("Asset:SubscriptionExtended", async ({ event, context }) => {
+  const assetAddress = event.log.address.toLowerCase();
+  const subscriber = event.args.subscriber;
+
+  // 1. Update State: extend the subscription end time
+  await context.db.update(Subscription, { id: `${assetAddress}_${subscriber}` }).set({
+    endTime: event.args.endTime,
+  });
+
+  // 2. Log History
+  await context.db.insert(Asset_SubscriptionExtended).values({
+    id: getEventId(event),
+    subscriber: subscriber,
+    endTime: event.args.endTime,
+    assetAddress: assetAddress,
+    blockNumber: event.block.number,
+    blockTimestamp: event.block.timestamp,
+  });
+});
+
+ponder.on("Asset:CreatorFeeClaimed", async ({ event, context }) => {
+  await context.db.insert(Asset_CreatorFeeClaimed).values({
+    id: getEventId(event),
+    subscriber: event.args.subscriber,
+    amount: event.args.amount,
+    assetAddress: event.log.address.toLowerCase(),
     blockNumber: event.block.number,
     blockTimestamp: event.block.timestamp,
   });
