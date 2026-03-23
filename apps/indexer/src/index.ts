@@ -95,14 +95,15 @@ ponder.on("Asset:SubscriptionAdded", async ({ event, context }) => {
 
   const id = `${assetAddress}_${subscriber}`;
   
-  // Fetch existing subscription to accurately conditionally update startTime
+  // Fetch existing subscription to preserve continuity of startTime
   const existingSub = await context.db.find(Subscription, { id });
 
   let computedStartTime = event.args.startTime;
 
-  // If the subscriber previously had a subscription, and they topped up while it was still active,
-  // the contract rigidly sets the new event's startTime to equal the previous subscription's endTime.
-  // We check for this exact match to safely preserve their original unbroken start time.
+  // When the contract creates a new nonce (terms changed mid-subscription),
+  // it sets startTime = previous subscription's endTime, chaining them seamlessly.
+  // We detect this and preserve the original startTime to show unbroken continuity.
+  // Pure extensions (same terms) are handled by SubscriptionExtended instead.
   if (existingSub && existingSub.endTime === event.args.startTime) {
     computedStartTime = existingSub.startTime;
   }

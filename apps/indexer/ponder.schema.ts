@@ -18,15 +18,20 @@ export const AssetIdToAddress = onchainTable("asset_id_to_address", (t) => ({
   assetAddress: t.text().notNull(),
 }));
 
+// Tracks the current state of a subscriber's subscription to an asset.
+// One row per asset–subscriber pair (not per nonce). When terms change mid-subscription
+// (price, payer, fee share), the contract creates a new nonce but the indexer preserves
+// the original startTime to show unbroken continuity. payer and nonce always reflect
+// the latest on-chain subscription record.
 export const Subscription = onchainTable("subscription", (t) => ({
-  id: t.text().primaryKey(),    // Composite: `${asset}_${subscriber}`
-  assetId: t.text().notNull(),  // Links to AssetEntity.id
-  subscriber: t.text().notNull(), // bytes32 subscriber identity hash
-  payer: t.text().notNull(),       // address that paid for the subscription
-  startTime: t.bigint().notNull(),
-  endTime: t.bigint().notNull(),
-  nonce: t.bigint().notNull(),
-  isActive: t.boolean().notNull(),
+  id: t.text().primaryKey(),       // Composite: `${assetAddress}_${subscriber}`
+  assetId: t.text().notNull(),     // Links to AssetEntity.id (asset contract address)
+  subscriber: t.text().notNull(),  // bytes32 subscriber identity hash
+  payer: t.text().notNull(),       // address that paid (latest nonce)
+  startTime: t.bigint().notNull(), // original start of unbroken subscription continuity
+  endTime: t.bigint().notNull(),   // current expiry (updated by SubscriptionAdded & SubscriptionExtended)
+  nonce: t.bigint().notNull(),     // latest on-chain nonce (increments when terms change)
+  isActive: t.boolean().notNull(), // false when revoked or cancelled
 }), (table) => ({
   assetIdIdx: index().on(table.assetId),
   subscriberIdx: index().on(table.subscriber),
