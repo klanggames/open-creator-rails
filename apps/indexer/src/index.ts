@@ -1,7 +1,7 @@
 import { ponder } from "ponder:registry";
-import { 
-  AssetEntity, 
-  Subscription, 
+import {
+  AssetEntity,
+  Subscription,
   AssetRegistry_AssetCreated,
   AssetRegistry_OwnershipTransferred,
   AssetRegistry_RegistryFeeShareUpdated,
@@ -15,9 +15,9 @@ import {
   Asset_OwnershipTransferred
 } from "../ponder.schema";
 
-// Helper function to generate robust IDs if event.log.id is missing
-const getEventId = (event: any) => {
-  return `${event.transaction.hash}-${event.log.logIndex}`;
+// Helper function to generate robust IDs for event history rows
+const getEventId = (event: any, chainId: number) => {
+  return `${chainId}-${event.transaction.hash}-${event.log.logIndex}`;
 };
 
 // ============================================================================
@@ -25,21 +25,25 @@ const getEventId = (event: any) => {
 // ============================================================================
 
 ponder.on("AssetRegistry:AssetCreated", async ({ event, context }) => {
+  const chainId = context.chain?.id as number;
   const assetAddress = event.args.asset.toLowerCase();
   const owner = event.args.owner.toLowerCase();
   const tokenAddress = event.args.tokenAddress.toLowerCase();
 
   // 1. Create the persistent Asset Entity
   await context.db.insert(AssetEntity).values({
-    id: assetAddress,
+    id: `${chainId}_${assetAddress}`,
+    chainId: chainId,
     assetId: event.args.assetId,
+    address: assetAddress,
     registryAddress: event.log.address,
     owner: owner,
   });
 
   // 2. Log immutable history
   await context.db.insert(AssetRegistry_AssetCreated).values({
-    id: getEventId(event),
+    id: getEventId(event, chainId),
+    chainId: chainId,
     assetId: event.args.assetId,
     asset: assetAddress,
     subscriptionPrice: event.args.subscriptionPrice,
@@ -52,8 +56,10 @@ ponder.on("AssetRegistry:AssetCreated", async ({ event, context }) => {
 });
 
 ponder.on("AssetRegistry:OwnershipTransferred", async ({ event, context }) => {
+  const chainId = context.chain?.id as number;
   await context.db.insert(AssetRegistry_OwnershipTransferred).values({
-    id: getEventId(event),
+    id: getEventId(event, chainId),
+    chainId: chainId,
     previousOwner: event.args.previousOwner.toLowerCase(),
     newOwner: event.args.newOwner.toLowerCase(),
     registryAddress: event.log.address,
@@ -63,8 +69,10 @@ ponder.on("AssetRegistry:OwnershipTransferred", async ({ event, context }) => {
 });
 
 ponder.on("AssetRegistry:RegistryFeeShareUpdated", async ({ event, context }) => {
+  const chainId = context.chain?.id as number;
   await context.db.insert(AssetRegistry_RegistryFeeShareUpdated).values({
-    id: getEventId(event),
+    id: getEventId(event, chainId),
+    chainId: chainId,
     newRegistryFeeShare: event.args.newRegistryFeeShare,
     registryAddress: event.log.address,
     blockNumber: event.block.number,
@@ -73,8 +81,10 @@ ponder.on("AssetRegistry:RegistryFeeShareUpdated", async ({ event, context }) =>
 });
 
 ponder.on("AssetRegistry:RegistryFeeClaimedBatch", async ({ event, context }) => {
+  const chainId = context.chain?.id as number;
   await context.db.insert(AssetRegistry_RegistryFeeClaimedBatch).values({
-    id: getEventId(event),
+    id: getEventId(event, chainId),
+    chainId: chainId,
     assetId: event.args.assetId,
     totalAmount: event.args.totalAmount,
     registryAddress: event.log.address,
@@ -89,12 +99,14 @@ ponder.on("AssetRegistry:RegistryFeeClaimedBatch", async ({ event, context }) =>
 // ============================================================================
 
 ponder.on("Asset:SubscriptionAdded", async ({ event, context }) => {
-  const assetAddress = event.log.address.toLowerCase(); 
+  const chainId = context.chain?.id as number;
+  const assetAddress = event.log.address.toLowerCase();
   const subscriber = event.args.subscriber;
   const payer = event.args.payer.toLowerCase();
 
-  const id = `${assetAddress}_${subscriber}`;
-  
+  const assetEntityId = `${chainId}_${assetAddress}`;
+  const id = `${assetEntityId}_${subscriber}`;
+
   // Fetch existing subscription to preserve continuity of startTime
   const existingSub = await context.db.find(Subscription, { id });
 
@@ -111,7 +123,8 @@ ponder.on("Asset:SubscriptionAdded", async ({ event, context }) => {
   // 1. Upsert Subscription using correct Drizzle syntax
   await context.db.insert(Subscription).values({
     id: id,
-    assetId: assetAddress,
+    chainId: chainId,
+    assetId: assetEntityId,
     subscriber: subscriber,
     payer: payer,
     startTime: event.args.startTime,
@@ -128,7 +141,8 @@ ponder.on("Asset:SubscriptionAdded", async ({ event, context }) => {
 
   // 2. Log History
   await context.db.insert(Asset_SubscriptionAdded).values({
-    id: getEventId(event),
+    id: getEventId(event, chainId),
+    chainId: chainId,
     subscriber: subscriber,
     payer: payer,
     startTime: event.args.startTime,
@@ -141,17 +155,19 @@ ponder.on("Asset:SubscriptionAdded", async ({ event, context }) => {
 });
 
 ponder.on("Asset:SubscriptionExtended", async ({ event, context }) => {
+  const chainId = context.chain?.id as number;
   const assetAddress = event.log.address.toLowerCase();
   const subscriber = event.args.subscriber;
 
   // 1. Update State: extend the subscription end time
-  await context.db.update(Subscription, { id: `${assetAddress}_${subscriber}` }).set({
+  await context.db.update(Subscription, { id: `${chainId}_${assetAddress}_${subscriber}` }).set({
     endTime: event.args.endTime,
   });
 
   // 2. Log History
   await context.db.insert(Asset_SubscriptionExtended).values({
-    id: getEventId(event),
+    id: getEventId(event, chainId),
+    chainId: chainId,
     subscriber: subscriber,
     endTime: event.args.endTime,
     assetAddress: assetAddress,
@@ -161,8 +177,10 @@ ponder.on("Asset:SubscriptionExtended", async ({ event, context }) => {
 });
 
 ponder.on("Asset:CreatorFeeClaimed", async ({ event, context }) => {
+  const chainId = context.chain?.id as number;
   await context.db.insert(Asset_CreatorFeeClaimed).values({
-    id: getEventId(event),
+    id: getEventId(event, chainId),
+    chainId: chainId,
     subscriber: event.args.subscriber,
     amount: event.args.amount,
     assetAddress: event.log.address.toLowerCase(),
@@ -172,17 +190,19 @@ ponder.on("Asset:CreatorFeeClaimed", async ({ event, context }) => {
 });
 
 ponder.on("Asset:SubscriptionRevoked", async ({ event, context }) => {
+  const chainId = context.chain?.id as number;
   const assetAddress = event.log.address.toLowerCase();
   const subscriber = event.args.subscriber;
 
   // 1. Update State: Mark as inactive
-  await context.db.update(Subscription, { id: `${assetAddress}_${subscriber}` }).set({
+  await context.db.update(Subscription, { id: `${chainId}_${assetAddress}_${subscriber}` }).set({
     isActive: false,
   });
 
   // 2. Log History
   await context.db.insert(Asset_SubscriptionRevoked).values({
-    id: getEventId(event),
+    id: getEventId(event, chainId),
+    chainId: chainId,
     subscriber: subscriber,
     assetAddress: assetAddress,
     blockNumber: event.block.number,
@@ -191,17 +211,19 @@ ponder.on("Asset:SubscriptionRevoked", async ({ event, context }) => {
 });
 
 ponder.on("Asset:SubscriptionCancelled", async ({ event, context }) => {
+  const chainId = context.chain?.id as number;
   const assetAddress = event.log.address.toLowerCase();
   const subscriber = event.args.subscriber;
 
   // 1. Update State: Mark as inactive
-  await context.db.update(Subscription, { id: `${assetAddress}_${subscriber}` }).set({
+  await context.db.update(Subscription, { id: `${chainId}_${assetAddress}_${subscriber}` }).set({
     isActive: false,
   });
 
   // 2. Log History
   await context.db.insert(Asset_SubscriptionCancelled).values({
-    id: getEventId(event),
+    id: getEventId(event, chainId),
+    chainId: chainId,
     subscriber: subscriber,
     assetAddress: assetAddress,
     blockNumber: event.block.number,
@@ -210,8 +232,10 @@ ponder.on("Asset:SubscriptionCancelled", async ({ event, context }) => {
 });
 
 ponder.on("Asset:SubscriptionPriceUpdated", async ({ event, context }) => {
+  const chainId = context.chain?.id as number;
   await context.db.insert(Asset_SubscriptionPriceUpdated).values({
-    id: getEventId(event),
+    id: getEventId(event, chainId),
+    chainId: chainId,
     newSubscriptionPrice: event.args.newSubscriptionPrice,
     assetAddress: event.log.address.toLowerCase(),
     blockNumber: event.block.number,
@@ -220,12 +244,13 @@ ponder.on("Asset:SubscriptionPriceUpdated", async ({ event, context }) => {
 });
 
 ponder.on("Asset:OwnershipTransferred", async ({ event, context }) => {
+  const chainId = context.chain?.id as number;
   const assetAddress = event.log.address.toLowerCase();
   const newOwner = event.args.newOwner.toLowerCase();
 
   // 1. Update the mutable Asset Entity (if exists)
   try {
-    await context.db.update(AssetEntity, { id: assetAddress }).set({
+    await context.db.update(AssetEntity, { id: `${chainId}_${assetAddress}` }).set({
       owner: newOwner,
     });
   } catch (e: any) {
@@ -238,7 +263,8 @@ ponder.on("Asset:OwnershipTransferred", async ({ event, context }) => {
 
   // 2. Log History
   await context.db.insert(Asset_OwnershipTransferred).values({
-    id: getEventId(event),
+    id: getEventId(event, chainId),
+    chainId: chainId,
     previousOwner: event.args.previousOwner.toLowerCase(),
     newOwner: newOwner,
     assetAddress: assetAddress,
