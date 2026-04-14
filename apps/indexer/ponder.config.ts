@@ -22,7 +22,11 @@ export default createConfig({
     ...(process.env.PONDER_RPC_URL_11155111 ? {
       sepolia: {
         id: 11155111,
-        rpc: process.env.PONDER_RPC_URL_11155111,
+        rpc: [
+          process.env.PONDER_RPC_URL_11155111,
+          "https://ethereum-sepolia-rpc.publicnode.com",
+          "https://1rpc.io/sepolia",
+        ],
       }
     } : {}),
     ...(process.env.PONDER_RPC_URL_31337 ? {

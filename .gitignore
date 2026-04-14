@@ -2,3 +2,7 @@ node_modules
 .env
 out/
 cache/
+
+# macOS
+.DS_Store
+**/.DS_Store
