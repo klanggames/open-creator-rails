@@ -1564,4 +1564,94 @@ contract AssetTest is BaseTest {
         (uint256 claimed,,) = asset.claimRegistryFee(_subscriber);
         assertEq(claimed, expectedFee);
     }
+
+    // ─── subscribeWithAllowance ───────────────────────────────────────────────
+
+    function _subscribeWithAllowance(bytes32 subscriber, uint256 count) internal returns (uint256 subscription) {
+        uint256 value = asset.getSubscriptionPrice(count);
+        vm.startPrank(signer);
+        testToken.approve(address(asset), value);
+        subscription = asset.subscribeWithAllowance(subscriber, count);
+        vm.stopPrank();
+    }
+
+    function test_subscribeWithAllowance() public {
+        uint256 expectedFee = SUBSCRIPTION_PRICE;
+        uint256 signerBalanceBefore = testToken.balanceOf(signer);
+        uint256 assetBalanceBefore = testToken.balanceOf(address(asset));
+
+        vm.startPrank(signer);
+        testToken.approve(address(asset), asset.getSubscriptionPrice(1));
+        vm.expectEmit(true, true, true, true);
+        emit Asset.SubscriptionAdded(
+            _subscriber,
+            block.timestamp,
+            block.timestamp + SUBSCRIPTION_DURATION,
+            signer,
+            SUBSCRIPTION_PRICE,
+            assetRegistry.getRegistryFeeShare()
+        );
+        uint256 subscription = asset.subscribeWithAllowance(_subscriber, 1);
+        vm.stopPrank();
+
+        assertEq(subscription, block.timestamp + SUBSCRIPTION_DURATION);
+        assertEq(asset.getSubscriptionExpiration(_subscriber), subscription);
+        assertTrue(asset.isSubscriptionActive(_subscriber));
+        assertEq(testToken.balanceOf(address(asset)), assetBalanceBefore + expectedFee);
+        assertEq(testToken.balanceOf(signer), signerBalanceBefore - expectedFee);
+        assertEq(testToken.allowance(signer, address(asset)), 0, "allowance fully consumed");
+    }
+
+    function test_subscribeWithAllowance_multiplePeriods() public {
+        uint256 signerBalanceBefore = testToken.balanceOf(signer);
+        uint256 subscription = _subscribeWithAllowance(_subscriber, 3);
+        assertEq(subscription, block.timestamp + 3 * SUBSCRIPTION_DURATION);
+        assertEq(testToken.balanceOf(signer), signerBalanceBefore - 3 * SUBSCRIPTION_PRICE);
+    }
+
+    function test_subscribeWithAllowance_extendsActiveSubscription() public {
+        uint256 first = _subscribeWithAllowance(_subscriber, 1);
+
+        vm.startPrank(signer);
+        testToken.approve(address(asset), asset.getSubscriptionPrice(1));
+        vm.expectEmit(true, true, false, true);
+        emit Asset.SubscriptionExtended(_subscriber, first + SUBSCRIPTION_DURATION);
+        uint256 second = asset.subscribeWithAllowance(_subscriber, 1);
+        vm.stopPrank();
+        assertEq(second, first + SUBSCRIPTION_DURATION);
+    }
+
+    function test_subscribeWithAllowance_revertsWithoutAllowance() public {
+        vm.prank(signer);
+        vm.expectRevert();
+        asset.subscribeWithAllowance(_subscriber, 1);
+    }
+
+    function test_subscribeWithAllowance_revertsOnZeroCount() public {
+        vm.prank(signer);
+        vm.expectRevert(Asset.InsufficientFunds.selector);
+        asset.subscribeWithAllowance(_subscriber, 0);
+    }
+
+    function test_subscribeWithAllowance_revertsWhenRevoked() public {
+        _subscribeWithAllowance(_subscriber, 1);
+        vm.prank(assetOwner);
+        asset.revokeSubscription(_subscriber);
+
+        uint256 value = asset.getSubscriptionPrice(1);
+        vm.startPrank(signer);
+        testToken.approve(address(asset), value);
+        vm.expectRevert(Asset.OnlyUnrevokedUnauthorizedSubscriber.selector);
+        asset.subscribeWithAllowance(_subscriber, 1);
+        vm.stopPrank();
+    }
+
+    function test_subscribeWithAllowance_payerIsSender() public {
+        _subscribeWithAllowance(_subscriber, 1);
+        // Cancelling as the subscriber refunds the payer, which must be the sender of subscribeWithAllowance.
+        uint256 before = testToken.balanceOf(signer);
+        vm.warp(block.timestamp + 1);
+        _cancelAsSubscriber();
+        assertGe(testToken.balanceOf(signer), before);
+    }
 }

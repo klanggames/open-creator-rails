@@ -222,6 +222,20 @@ contract Asset is Ownable, ReentrancyGuard, IAsset {
         return _subscribe(subscriber, payer, count);
     }
 
+    /// @inheritdoc IAsset
+    function subscribeWithAllowance(bytes32 subscriber, uint256 count)
+        external
+        nonReentrant
+        onlyUnrevoked(subscriber)
+        returns (uint256)
+    {
+        if (count == 0) {
+            revert InsufficientFunds();
+        }
+        SafeERC20.safeTransferFrom(TOKEN_CONTRACT, msg.sender, address(this), count * subscriptionPrice);
+        return _subscribe(subscriber, msg.sender, count);
+    }
+
     function _subscribe(bytes32 subscriber, address payer, uint256 count) internal returns (uint256 endTime) {
         uint256 duration = count * SUBSCRIPTION_DURATION;
 
