@@ -85,6 +85,35 @@ interface IAsset {
         bytes32 s
     ) external returns (uint256);
 
+    /// @notice Subscribes using a prior ERC-20 allowance: `msg.sender` is the payer and
+    ///         refund beneficiary, and must have approved this asset for `count * subscriptionPrice`.
+    ///         Enables payers that cannot produce an ECDSA permit, such as smart-contract accounts
+    ///         (ERC-4337, EIP-7702) and multisigs. Reverts if the subscriber is revoked, or if
+    ///         `expectedSubscriptionPrice` differs from the current per-duration price.
+    /// @param subscriber Subscriber hash to subscribe (recommended canonical form:
+    ///        keccak256(abi.encode(subscriberId, subscriberAddress))).
+    /// @param count Number of full subscription durations to subscribe for. Must be > 0.
+    /// @param expectedSubscriptionPrice Per-duration price the payer agreed to; guards a standing
+    ///        allowance against being charged after a price change.
+    /// @return Subscription expiry in Unix timestamp.
+    function subscribeWithAllowance(bytes32 subscriber, uint256 count, uint256 expectedSubscriptionPrice)
+        external
+        returns (uint256);
+
+    /// @notice Registry-routed variant of `subscribeWithAllowance`. Callable only by the registry, which
+    ///         passes its own `msg.sender` as `payer`; the payer must have approved this asset (not the registry).
+    /// @param subscriber Subscriber hash to subscribe.
+    /// @param payer Payer and refund beneficiary; the original caller of the registry.
+    /// @param count Number of full subscription durations to subscribe for. Must be > 0.
+    /// @param expectedSubscriptionPrice Per-duration price the payer agreed to.
+    /// @return Subscription expiry in Unix timestamp.
+    function subscribeWithAllowanceViaRegistry(
+        bytes32 subscriber,
+        address payer,
+        uint256 count,
+        uint256 expectedSubscriptionPrice
+    ) external returns (uint256);
+
     /// @notice Claims the creator fee for a subscriber. Callable only by the asset owner.
     ///         Updates and emits claim cursor metadata (`claimedAtTimestamp`, `claimedAtNonce`) in
     ///         `CreatorFeeClaimed` to support deterministic indexer continuation.
