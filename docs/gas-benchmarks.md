@@ -16,13 +16,14 @@ FOUNDRY_PROFILE=gas forge test --isolate -vv
 | `test_gas_claimRegistryFee_nonceDepth_*` | Nonces per subscriber | `Asset.claimRegistryFee(bytes32)` → `_claimable` loop |
 | `test_gas_revokeSubscription_nonceDepth_*` | Stacked nonces | `Asset.revokeSubscription` → `_removeSubscription` loop |
 | `test_gas_cancelSubscription_nonceDepth_*` | Stacked nonces | `Asset.cancelSubscription` → `_removeSubscription` loop |
+| `test_gas_subscribeWithAllowance_nonceDepth_*` | Stacked nonces | `Asset.subscribeWithAllowance` → `_subscribe` (renewal; expected flat) |
 
 **Nonce depth (claim):** each renewal happens after the previous subscription expires, producing one storage record per nonce.
 ```
 vm.warp(endTime + 1);
 ```
 
-**Stacked nonces (revoke/cancel):** price is bumped between subscribes so each call creates a new future record without extending the same nonce.
+**Stacked nonces (revoke/cancel/subscribe):** price is bumped between subscribes so each call creates a new future record without extending the same nonce.
 ```
 asset.setSubscriptionPrice(SUBSCRIPTION_PRICE + (i * 100));
 ```
@@ -65,7 +66,7 @@ FOUNDRY_PROFILE=gas forge test \
   --isolate -vv
 ```
 
-Run every test at one scale (e.g. all four paths at depth 100):
+Run every test at one scale (e.g. all paths at depth 100):
 
 ```bash
 FOUNDRY_PROFILE=gas forge test --match-test 'nonceDepth_100\(\)' --isolate -vv
@@ -101,6 +102,7 @@ Gas is the **measured call only** (setup/subscribe loops are excluded).
 - [`snapshots/gas/claimRegistryFee_nonceDepth.json`](../snapshots/gas/claimRegistryFee_nonceDepth.json)
 - [`snapshots/gas/revokeSubscription_nonceDepth.json`](../snapshots/gas/revokeSubscription_nonceDepth.json)
 - [`snapshots/gas/cancelSubscription_nonceDepth.json`](../snapshots/gas/cancelSubscription_nonceDepth.json)
+- [`snapshots/gas/subscribeWithAllowance_nonceDepth.json`](../snapshots/gas/subscribeWithAllowance_nonceDepth.json)
 
 Example:
 
@@ -157,7 +159,7 @@ xychart
     title "Cancel Subscription"
     x-axis "Nonce" [1, 10, 100, 1000, 10000]
     y-axis "Gas Cost" 0 --> 1000000000
-    line [87880, 301327, 2414287, 23632999, 244730106]
+    line [87916, 301362, 2414322, 23633034, 244730141]
 ```
 
 ```mermaid
@@ -165,7 +167,7 @@ xychart
     title "Claim Creator Fee"
     x-axis "Nonce" [1, 10, 100, 1000, 10000]
     y-axis "Gas Cost" 0 --> 1000000000
-    line [105201, 235896, 1344957, 12546948, 135704354]
+    line [105098, 235343, 1339904, 12496895, 135204301]
 ```
 
 ```mermaid
@@ -173,7 +175,7 @@ xychart
     title "Claim Registry Fee"
     x-axis "Nonce" [1, 10, 100, 1000, 10000]
     y-axis "Gas Cost" 0 --> 1000000000
-    line [103871, 233991, 1337301, 12481776, 135064026]
+    line [103847, 233994, 1337574, 12484749, 135093999]
 ```
 
 ```mermaid
@@ -181,7 +183,15 @@ xychart
     title "Revoke Subscription"
     x-axis "Nonce" [1, 10, 100, 1000, 10000]
     y-axis "Gas Cost" 0 --> 1000000000
-    line [137670, 351205, 2465050, 23692608, 244878183]
+    line [137705, 351240, 2465086, 23692643, 244878218]
+```
+
+```mermaid
+xychart
+    title "Subscribe With Allowance"
+    x-axis "Nonce" [1, 10, 100, 1000, 10000]
+    y-axis "Gas Cost" 0 --> 1000000000
+    line [201249, 184149, 184149, 184149, 184149]
 ```
 
 <!-- End: generated -->
