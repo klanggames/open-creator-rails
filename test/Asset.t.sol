@@ -1704,4 +1704,14 @@ contract AssetTest is BaseTest {
         assertEq(testToken.balanceOf(signer), signerBalanceBefore + 2 * SUBSCRIPTION_PRICE);
         assertEq(testToken.balanceOf(address(this)), 0);
     }
+
+    function test_subscribeWithAllowanceViaRegistry_onlyRegistry() public {
+        // Direct callers must not be able to name an arbitrary payer and spend their allowance.
+        vm.prank(signer);
+        testToken.approve(address(asset), type(uint256).max);
+
+        vm.prank(UNAUTHORIZED);
+        vm.expectRevert(Asset.OnlyRegistryUnauthorizedAccount.selector);
+        asset.subscribeWithAllowanceViaRegistry(_subscriber, signer, 1, SUBSCRIPTION_PRICE);
+    }
 }

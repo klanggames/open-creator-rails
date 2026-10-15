@@ -229,6 +229,16 @@ contract Asset is Ownable, ReentrancyGuard, IAsset {
         return _subscribeWithAllowance(subscriber, msg.sender, count, expectedSubscriptionPrice);
     }
 
+    /// @inheritdoc IAsset
+    function subscribeWithAllowanceViaRegistry(
+        bytes32 subscriber,
+        address payer,
+        uint256 count,
+        uint256 expectedSubscriptionPrice
+    ) external nonReentrant onlyRegistry onlyUnrevoked(subscriber) returns (uint256) {
+        return _subscribeWithAllowance(subscriber, payer, count, expectedSubscriptionPrice);
+    }
+
     function _subscribeWithAllowance(
         bytes32 subscriber,
         address payer,

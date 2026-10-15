@@ -100,6 +100,20 @@ interface IAsset {
         external
         returns (uint256);
 
+    /// @notice Registry-routed variant of `subscribeWithAllowance`. Callable only by the registry, which
+    ///         passes its own `msg.sender` as `payer`; the payer must have approved this asset (not the registry).
+    /// @param subscriber Subscriber hash to subscribe.
+    /// @param payer Payer and refund beneficiary; the original caller of the registry.
+    /// @param count Number of full subscription durations to subscribe for. Must be > 0.
+    /// @param expectedSubscriptionPrice Per-duration price the payer agreed to.
+    /// @return Subscription expiry in Unix timestamp.
+    function subscribeWithAllowanceViaRegistry(
+        bytes32 subscriber,
+        address payer,
+        uint256 count,
+        uint256 expectedSubscriptionPrice
+    ) external returns (uint256);
+
     /// @notice Claims the creator fee for a subscriber. Callable only by the asset owner.
     ///         Updates and emits claim cursor metadata (`claimedAtTimestamp`, `claimedAtNonce`) in
     ///         `CreatorFeeClaimed` to support deterministic indexer continuation.
