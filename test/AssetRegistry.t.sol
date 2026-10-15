@@ -654,7 +654,8 @@ contract AssetRegistryTest is BaseTest {
 
         vm.startPrank(signer);
         testToken.approve(address(asset), asset.getSubscriptionPrice(1));
-        vm.expectRevert(AssetRegistry.OnlyUnrevokedUnauthorizedSubscriber.selector);
+        // Enforced by the asset; the registry does not repeat the check.
+        vm.expectRevert(Asset.OnlyUnrevokedUnauthorizedSubscriber.selector);
         assetRegistry.subscribeWithAllowance(ASSET_ID, _subscriber, 1, SUBSCRIPTION_PRICE);
         vm.stopPrank();
     }

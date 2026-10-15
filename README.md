@@ -578,7 +578,7 @@ All external functions for the registry and asset contracts, for use with JSON-R
 
 **subscribeWithAllowance** : Subscribes a subscriber to the asset using a prior ERC-20 allowance instead of a permit; forwards to the asset contract. For payers that cannot produce an ECDSA permit signature (smart-contract accounts, multisigs). `msg.sender` is the payer and the refund beneficiary on cancel/revoke, and must have approved the **asset contract** (`getAsset(_assetId)`, not the registry) for at least `getSubscriptionPrice(_assetId, _count)`. Reverts with `SubscriptionPriceMismatch` if `_expectedSubscriptionPrice` differs from the asset's current price, and if the subscriber has been revoked for the asset.
 - Type: write
-- Permission: `onlyUnrevoked(_assetId, _subscriber)`
+- Permission: none (revocation is enforced by the asset)
 > reverts if the subscriber has been revoked for the asset
 - Parameters:
   - `bytes32 _assetId` : Asset identifier.

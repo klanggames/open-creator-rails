@@ -148,7 +148,7 @@ contract AssetRegistry is Ownable, IAssetRegistry {
         bytes32 _subscriber,
         uint256 _count,
         uint256 _expectedSubscriptionPrice
-    ) external onlyUnrevoked(_assetId, _subscriber) returns (uint256) {
+    ) external returns (uint256) {
         address asset = getAsset(_assetId);
         return
             IAsset(asset).subscribeWithAllowanceViaRegistry(_subscriber, msg.sender, _count, _expectedSubscriptionPrice);
