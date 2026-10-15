@@ -246,7 +246,7 @@ sequenceDiagram
 
 ## revokeSubscription
 
-The **creator (asset owner)** forcibly ends a subscriber's access. Unlike cancellation, revocation refunds all remaining time including partial-period dust, and **permanently bans** the subscriber from resubscribing until the owner calls `unrevokeSubscription`.
+The **creator (asset owner)** forcibly ends a subscriber's access. Unlike cancellation, revocation refunds all remaining time including partial-period dust, and **bans** the subscriber from resubscribing until the owner calls `unrevokeSubscription`.
 
 ```mermaid
 sequenceDiagram

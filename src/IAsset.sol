@@ -48,7 +48,7 @@ interface IAsset {
     /// @return True if the subscriber's subscription has expired (or never existed).
     function isSubscriptionExpired(bytes32 subscriber) external view returns (bool);
 
-    /// @notice Checks whether a subscriber's subscription has been permanently revoked by the asset owner.
+    /// @notice Checks whether a subscriber's subscription has been revoked by the asset owner.
     ///         Revoked subscribers cannot resubscribe or cancel until the owner calls `unrevokeSubscription`.
     /// @param subscriber Subscriber hash to check (recommended canonical form:
     ///        keccak256(abi.encode(subscriberId, subscriberAddress))).
@@ -63,7 +63,7 @@ interface IAsset {
 
     /// @notice Subscribes using ERC-2612 permit: payer signs permit,
     ///         then payment is pulled and subscription is attributed to `subscriber`.
-    ///         Reverts if the subscriber has been permanently revoked.
+    ///         Reverts if the subscriber has been revoked.
     /// @param subscriber Subscriber hash to subscribe (recommended canonical form:
     ///        keccak256(abi.encode(subscriberId, subscriberAddress))).
     /// @param payer Subscription payer and subscription refund beneficiary.
@@ -88,12 +88,17 @@ interface IAsset {
     /// @notice Subscribes using a prior ERC-20 allowance: `msg.sender` is the payer and
     ///         refund beneficiary, and must have approved this asset for `count * subscriptionPrice`.
     ///         Enables payers that cannot produce an ECDSA permit, such as smart-contract accounts
-    ///         (ERC-4337, EIP-7702) and multisigs. Reverts if the subscriber has been permanently revoked.
+    ///         (ERC-4337, EIP-7702) and multisigs. Reverts if the subscriber is revoked, or if
+    ///         `expectedSubscriptionPrice` differs from the current per-duration price.
     /// @param subscriber Subscriber hash to subscribe (recommended canonical form:
     ///        keccak256(abi.encode(subscriberId, subscriberAddress))).
     /// @param count Number of full subscription durations to subscribe for. Must be > 0.
+    /// @param expectedSubscriptionPrice Per-duration price the payer agreed to; guards a standing
+    ///        allowance against being charged after a price change.
     /// @return Subscription expiry in Unix timestamp.
-    function subscribeWithAllowance(bytes32 subscriber, uint256 count) external returns (uint256);
+    function subscribeWithAllowance(bytes32 subscriber, uint256 count, uint256 expectedSubscriptionPrice)
+        external
+        returns (uint256);
 
     /// @notice Claims the creator fee for a subscriber. Callable only by the asset owner.
     ///         Updates and emits claim cursor metadata (`claimedAtTimestamp`, `claimedAtNonce`) in

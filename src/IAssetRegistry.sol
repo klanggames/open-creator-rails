@@ -50,7 +50,7 @@ interface IAssetRegistry {
     /// @return Total price for the number of subscription durations.
     function getSubscriptionPrice(bytes32 _assetId, uint256 _count) external view returns (uint256);
 
-    /// @notice Checks whether a subscriber hash has been permanently revoked for the given asset.
+    /// @notice Checks whether a subscriber hash has been revoked for the given asset.
     ///         Revoked subscribers cannot resubscribe or cancel until the asset owner unrevokes them.
     /// @param _assetId Asset identifier.
     /// @param _subscriber Subscriber hash (recommended canonical form:
@@ -83,7 +83,7 @@ interface IAssetRegistry {
 
     /// @notice Subscribes a subscriber hash to the asset using ERC-2612 permit; forwards to the asset contract.
     ///         The payer signs the permit and is the refund beneficiary on cancel/revoke.
-    ///         Reverts if the subscriber has been permanently revoked for this asset.
+    ///         Reverts if the subscriber has been revoked for this asset.
     /// @param _assetId Asset identifier.
     /// @param _subscriber Subscriber hash (recommended canonical form:
     ///        keccak256(abi.encode(subscriberId, subscriberAddress))).

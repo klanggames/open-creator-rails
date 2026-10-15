@@ -58,6 +58,7 @@ contract Asset is Ownable, ReentrancyGuard, IAsset {
     error InvalidSpender();
     error PermitFailed();
     error InsufficientFunds();
+    error SubscriptionPriceMismatch();
     error SubscriptionNotFound();
     error SubscriptionAlreadyRevoked();
     error SubscriptionNotRevoked();
@@ -213,27 +214,43 @@ contract Asset is Ownable, ReentrancyGuard, IAsset {
         bytes32 r,
         bytes32 s
     ) external nonReentrant onlyUnrevoked(subscriber) returns (uint256) {
-        if (count == 0) {
-            revert InsufficientFunds();
-        }
-
-        _validatePermit(payer, spender, count * subscriptionPrice, deadline, v, r, s);
+        _validatePermit(payer, spender, _getPaymentValue(count), deadline, v, r, s);
 
         return _subscribe(subscriber, payer, count);
     }
 
     /// @inheritdoc IAsset
-    function subscribeWithAllowance(bytes32 subscriber, uint256 count)
+    function subscribeWithAllowance(bytes32 subscriber, uint256 count, uint256 expectedSubscriptionPrice)
         external
         nonReentrant
         onlyUnrevoked(subscriber)
         returns (uint256)
     {
+        return _subscribeWithAllowance(subscriber, msg.sender, count, expectedSubscriptionPrice);
+    }
+
+    function _subscribeWithAllowance(
+        bytes32 subscriber,
+        address payer,
+        uint256 count,
+        uint256 expectedSubscriptionPrice
+    ) internal returns (uint256) {
+        // An allowance is not bound to an amount the way a permit signature is, so the payer pins the price.
+        if (expectedSubscriptionPrice != subscriptionPrice) {
+            revert SubscriptionPriceMismatch();
+        }
+
+        SafeERC20.safeTransferFrom(TOKEN_CONTRACT, payer, address(this), _getPaymentValue(count));
+
+        return _subscribe(subscriber, payer, count);
+    }
+
+    function _getPaymentValue(uint256 count) internal view returns (uint256) {
         if (count == 0) {
             revert InsufficientFunds();
         }
-        SafeERC20.safeTransferFrom(TOKEN_CONTRACT, msg.sender, address(this), count * subscriptionPrice);
-        return _subscribe(subscriber, msg.sender, count);
+
+        return count * subscriptionPrice;
     }
 
     function _subscribe(bytes32 subscriber, address payer, uint256 count) internal returns (uint256 endTime) {

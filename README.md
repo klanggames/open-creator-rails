@@ -149,7 +149,7 @@ Example:
 
 ### Cancel Subscription
 
-Cancel a subscription as the subscriber. Unearned whole subscription periods are refunded to the original payer; partial periods are non-refundable. The subscriber signs an EIP-191 message off-chain and the script submits `cancelSubscription` in a single transaction — no on-chain commit step is required. Reverts if the subscriber has been permanently revoked by the asset owner.
+Cancel a subscription as the subscriber. Unearned whole subscription periods are refunded to the original payer; partial periods are non-refundable. The subscriber signs an EIP-191 message off-chain and the script submits `cancelSubscription` in a single transaction — no on-chain commit step is required. Reverts if the subscriber has been revoked by the asset owner.
 
 ```bash
 ./scripts/cancelSubscription.sh [env_file] <registry_index> <asset_id> <subscriber_id> <subscriber_private_key>
@@ -171,7 +171,7 @@ Example:
 
 ### Revoke Subscription
 
-Revoke a subscriber's subscription as the asset owner. Unlike cancellation, revocation refunds all remaining time to each original payer, including partial-period dust, and **permanently bans** the subscriber from resubscribing or cancelling until the owner calls `unrevokeSubscription`. Reverts if the subscriber is already revoked.
+Revoke a subscriber's subscription as the asset owner. Unlike cancellation, revocation refunds all remaining time to each original payer, including partial-period dust, and **bans** the subscriber from resubscribing or cancelling until the owner calls `unrevokeSubscription`. Reverts if the subscriber is already revoked.
 
 ```bash
 ./scripts/revokeSubscription.sh [env_file] <registry_index> <asset_id> <subscriber> <asset_owner_private_key>
@@ -508,7 +508,7 @@ All external functions for the registry and asset contracts, for use with JSON-R
 
 ---
 
-**isSubscriberRevoked** : Checks whether a subscriber has been permanently revoked for the given asset. Revoked subscribers cannot resubscribe or cancel until the asset owner unrevokes them.
+**isSubscriberRevoked** : Checks whether a subscriber has been revoked for the given asset. Revoked subscribers cannot resubscribe or cancel until the asset owner unrevokes them.
 - Type: read
 - Permission: none
 - Parameters:
@@ -556,10 +556,10 @@ All external functions for the registry and asset contracts, for use with JSON-R
 
 ---
 
-**subscribe** : Subscribes a subscriber to the asset using ERC-2612 permit; forwards to the asset contract. The permit is signed by the payer; the subscription is attributed to `_subscriber` (payer and subscriber can differ). The payer is the refund beneficiary on cancel/revoke. The permit `value` must equal `getSubscriptionPrice(_count)`. For cancellation-compatible identity, `_subscriber` should be `keccak256(abi.encode(subscriberId, subscriberAddress))`, where `subscriberAddress` is the address that will call `cancelSubscription` and sign the cancellation payload. Reverts if the subscriber has been permanently revoked for the asset.
+**subscribe** : Subscribes a subscriber to the asset using ERC-2612 permit; forwards to the asset contract. The permit is signed by the payer; the subscription is attributed to `_subscriber` (payer and subscriber can differ). The payer is the refund beneficiary on cancel/revoke. The permit `value` must equal `getSubscriptionPrice(_count)`. For cancellation-compatible identity, `_subscriber` should be `keccak256(abi.encode(subscriberId, subscriberAddress))`, where `subscriberAddress` is the address that will call `cancelSubscription` and sign the cancellation payload. Reverts if the subscriber has been revoked for the asset.
 - Type: write
 - Permission: `onlyUnrevoked(_assetId, _subscriber)`
-> reverts if the subscriber has been permanently revoked for the asset
+> reverts if the subscriber has been revoked for the asset
 - Parameters:
   - `bytes32 _assetId` : Asset identifier.
   - `bytes32 _subscriber` : Hash of the subscriber identity (who gets the access). Recommended canonical form: `keccak256(abi.encode(subscriberId, subscriberAddress))`.
@@ -802,7 +802,7 @@ All external functions for the registry and asset contracts, for use with JSON-R
 
 ---
 
-**isSubscriberRevoked** : Checks whether a subscriber has been permanently revoked by the asset owner. Revoked subscribers cannot resubscribe or cancel until the owner calls `unrevokeSubscription`.
+**isSubscriberRevoked** : Checks whether a subscriber has been revoked by the asset owner. Revoked subscribers cannot resubscribe or cancel until the owner calls `unrevokeSubscription`.
 - Type: read
 - Permission: none
 - Parameters:
@@ -824,10 +824,10 @@ All external functions for the registry and asset contracts, for use with JSON-R
 
 ---
 
-**subscribe** : Subscribes a subscriber using ERC-2612 permit: payer signs permit, then payment is pulled and subscription is attributed to the given subscriber. Payer and subscriber can differ (e.g. pay for someone else). The payer is the refund beneficiary on cancel/revoke. The permit `value` must equal `getSubscriptionPrice(count)`. For cancellation-compatible identity, `subscriber` should be `keccak256(abi.encode(subscriberId, subscriberAddress))`, where `subscriberAddress` is the address that will call `cancelSubscription` and sign the cancellation payload. Reverts if the subscriber has been permanently revoked.
+**subscribe** : Subscribes a subscriber using ERC-2612 permit: payer signs permit, then payment is pulled and subscription is attributed to the given subscriber. Payer and subscriber can differ (e.g. pay for someone else). The payer is the refund beneficiary on cancel/revoke. The permit `value` must equal `getSubscriptionPrice(count)`. For cancellation-compatible identity, `subscriber` should be `keccak256(abi.encode(subscriberId, subscriberAddress))`, where `subscriberAddress` is the address that will call `cancelSubscription` and sign the cancellation payload. Reverts if the subscriber has been revoked.
 - Type: write
 - Permission: `onlyUnrevoked(subscriber)`
-> reverts if the subscriber has been permanently revoked
+> reverts if the subscriber has been revoked
 - Parameters:
   - `bytes32 subscriber` : Hash of the subscriber identity (who gets the access). Recommended canonical form: `keccak256(abi.encode(subscriberId, subscriberAddress))`.
   - `address payer` : Payer; signs the permit and pays. Receives refunds on cancel/revoke.
@@ -837,6 +837,20 @@ All external functions for the registry and asset contracts, for use with JSON-R
   - `uint8 v` : Signature recovery id.
   - `bytes32 r` : Signature r.
   - `bytes32 s` : Signature s.
+- Returns:
+  - `uint256` : Subscription expiry in Unix timestamp.
+
+
+---
+
+**subscribeWithAllowance** : Subscribes a subscriber using a prior ERC-20 allowance instead of a permit, for payers that cannot produce an ECDSA permit signature (smart-contract accounts, multisigs). `msg.sender` is the payer and the refund beneficiary on cancel/revoke, and must have approved this asset for at least `getSubscriptionPrice(count)`. Because an allowance is not bound to an amount, the caller passes the per-period price they agreed to; the call reverts with `SubscriptionPriceMismatch` if the price has changed. Reverts if the subscriber has been revoked.
+- Type: write
+- Permission: `onlyUnrevoked(subscriber)`
+> reverts if the subscriber has been revoked
+- Parameters:
+  - `bytes32 subscriber` : Hash of the subscriber identity (who gets the access). Recommended canonical form: `keccak256(abi.encode(subscriberId, subscriberAddress))`.
+  - `uint256 count` : Number of full subscription periods to subscribe for (must be at least 1).
+  - `uint256 expectedSubscriptionPrice` : Per-period price the payer agreed to; must equal the current subscription price.
 - Returns:
   - `uint256` : Subscription expiry in Unix timestamp.
 
@@ -909,10 +923,10 @@ All external functions for the registry and asset contracts, for use with JSON-R
 
 ---
 
-**cancelSubscription** : Cancels the caller's subscription after validating an EIP-191 signature from `msg.sender`. Unearned whole subscription periods are refunded to each original payer (partial periods are non-refundable). There is no separate on-chain commit step: the subscriber signs an off-chain message, then submits one transaction with that signature. Reverts if the subscriber has been permanently revoked.
+**cancelSubscription** : Cancels the caller's subscription after validating an EIP-191 signature from `msg.sender`. Unearned whole subscription periods are refunded to each original payer (partial periods are non-refundable). There is no separate on-chain commit step: the subscriber signs an off-chain message, then submits one transaction with that signature. Reverts if the subscriber has been revoked.
 - Type: write
 - Permission: `onlyUnrevokedSubscriberId(subscriberId)`
-> reverts if the subscriber derived from `keccak256(abi.encode(subscriberId, msg.sender))` has been permanently revoked; additionally, `msg.sender` must be the subscriber address (the recovered ECDSA signer must equal `msg.sender`).
+> reverts if the subscriber derived from `keccak256(abi.encode(subscriberId, msg.sender))` has been revoked; additionally, `msg.sender` must be the subscriber address (the recovered ECDSA signer must equal `msg.sender`).
 - Parameters:
   - `string subscriberId` : Human-readable subscriber id used in the subscriber hash.
   - `bytes signature` : ECDSA signature by `msg.sender` over the Ethereum signed message hash of `keccak256(abi.encodePacked(chainid, assetAddress, subscriber))`, where `subscriber` is `keccak256(abi.encode(subscriberId, msg.sender))` and `assetAddress` is this asset contract.
@@ -1039,7 +1053,7 @@ All events emitted by the registry and asset contracts. Use for indexing, loggin
 
 ---
 
-**SubscriptionRevoked** : Emitted when a subscriber's subscription is revoked by the asset owner. The subscriber is permanently added to the revoked set; they cannot resubscribe until `unrevokeSubscription` is called.
+**SubscriptionRevoked** : Emitted when a subscriber's subscription is revoked by the asset owner. The subscriber is added to the revoked set; they cannot resubscribe until `unrevokeSubscription` is called.
 - Contract: `Asset`
 - Parameters:
   - `bytes32 indexed subscriber` : Subscriber whose subscription was revoked.
