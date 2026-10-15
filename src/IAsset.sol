@@ -48,7 +48,7 @@ interface IAsset {
     /// @return True if the subscriber's subscription has expired (or never existed).
     function isSubscriptionExpired(bytes32 subscriber) external view returns (bool);
 
-    /// @notice Checks whether a subscriber's subscription has been revoked by the asset owner.
+    /// @notice Checks whether a subscriber's subscription has been permanently revoked by the asset owner.
     ///         Revoked subscribers cannot resubscribe or cancel until the owner calls `unrevokeSubscription`.
     /// @param subscriber Subscriber hash to check (recommended canonical form:
     ///        keccak256(abi.encode(subscriberId, subscriberAddress))).
@@ -63,7 +63,7 @@ interface IAsset {
 
     /// @notice Subscribes using ERC-2612 permit: payer signs permit,
     ///         then payment is pulled and subscription is attributed to `subscriber`.
-    ///         Reverts if the subscriber has been revoked.
+    ///         Reverts if the subscriber has been permanently revoked.
     /// @param subscriber Subscriber hash to subscribe (recommended canonical form:
     ///        keccak256(abi.encode(subscriberId, subscriberAddress))).
     /// @param payer Subscription payer and subscription refund beneficiary.
