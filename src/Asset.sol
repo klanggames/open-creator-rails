@@ -58,6 +58,7 @@ contract Asset is Ownable, ReentrancyGuard, IAsset {
     error InvalidSpender();
     error PermitFailed();
     error InsufficientFunds();
+    error SubscriptionPriceMismatch();
     error SubscriptionNotFound();
     error SubscriptionAlreadyRevoked();
     error SubscriptionNotRevoked();
@@ -161,8 +162,12 @@ contract Asset is Ownable, ReentrancyGuard, IAsset {
         emit SubscriptionPriceUpdated(newSubscriptionPrice);
     }
 
-    function getSubscriptionPrice(uint256 count) external view returns (uint256) {
+    function _getSubscriptionPrice(uint256 count) internal view returns (uint256) {
         return count * subscriptionPrice;
+    }
+
+    function getSubscriptionPrice(uint256 count) external view returns (uint256) {
+        return _getSubscriptionPrice(count);
     }
 
     function getSubscriptionDuration() external view returns (uint256) {
@@ -170,7 +175,7 @@ contract Asset is Ownable, ReentrancyGuard, IAsset {
     }
 
     function getSubscriptionPriceAndDuration(uint256 count) external view returns (uint256 price, uint256 duration) {
-        price = count * subscriptionPrice;
+        price = _getSubscriptionPrice(count);
         duration = count * SUBSCRIPTION_DURATION;
     }
 
@@ -213,13 +218,56 @@ contract Asset is Ownable, ReentrancyGuard, IAsset {
         bytes32 r,
         bytes32 s
     ) external nonReentrant onlyUnrevoked(subscriber) returns (uint256) {
+        _validatePermit(payer, spender, _getPaymentValue(count), deadline, v, r, s);
+
+        return _subscribe(subscriber, payer, count);
+    }
+
+    /// @inheritdoc IAsset
+    function subscribeWithAllowance(bytes32 subscriber, uint256 count, uint256 expectedSubscriptionPrice)
+        external
+        nonReentrant
+        onlyUnrevoked(subscriber)
+        returns (uint256)
+    {
+        return _subscribeWithAllowance(subscriber, msg.sender, count, expectedSubscriptionPrice);
+    }
+
+    /// @inheritdoc IAsset
+    function subscribeWithAllowanceViaRegistry(
+        bytes32 subscriber,
+        address payer,
+        uint256 count,
+        uint256 expectedSubscriptionPrice
+    ) external nonReentrant onlyRegistry onlyUnrevoked(subscriber) returns (uint256) {
+        return _subscribeWithAllowance(subscriber, payer, count, expectedSubscriptionPrice);
+    }
+
+    function _subscribeWithAllowance(
+        bytes32 subscriber,
+        address payer,
+        uint256 count,
+        uint256 expectedSubscriptionPrice
+    ) internal returns (uint256) {
+        uint256 value = _getPaymentValue(count);
+
+        // An allowance is not bound to an amount the way a permit signature is, so the payer pins the price.
+        // count > 0 here, so this holds exactly when expectedSubscriptionPrice equals subscriptionPrice.
+        if (value != count * expectedSubscriptionPrice) {
+            revert SubscriptionPriceMismatch();
+        }
+
+        SafeERC20.safeTransferFrom(TOKEN_CONTRACT, payer, address(this), value);
+
+        return _subscribe(subscriber, payer, count);
+    }
+
+    function _getPaymentValue(uint256 count) internal view returns (uint256) {
         if (count == 0) {
             revert InsufficientFunds();
         }
 
-        _validatePermit(payer, spender, count * subscriptionPrice, deadline, v, r, s);
-
-        return _subscribe(subscriber, payer, count);
+        return _getSubscriptionPrice(count);
     }
 
     function _subscribe(bytes32 subscriber, address payer, uint256 count) internal returns (uint256 endTime) {
