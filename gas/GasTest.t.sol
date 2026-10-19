@@ -5,7 +5,7 @@ import {BaseTest} from "../test/Base.t.sol";
 import {console2} from "forge-std/console2.sol";
 
 /// @title GasTest
-/// @notice Gas scaling benchmarks for Asset claim, revoke, and cancel paths by nonce depth.
+/// @notice Gas scaling benchmarks for Asset claim, revoke, cancel, and allowance-subscribe paths by nonce depth.
 ///         Scale points: 1, 10, 100, 1_000, 10_000.
 /// @dev Not run by default `forge test`. Use `FOUNDRY_PROFILE=gas forge test --isolate`. See docs/gas-benchmarks.md.
 contract GasTest is BaseTest {
@@ -13,6 +13,7 @@ contract GasTest is BaseTest {
     string internal constant CLAIM_REGISTRY_SUB_ID = "gas-depth-claim-registry";
     string internal constant REVOKE_SUB_ID = "gas-depth-revoke";
     string internal constant CANCEL_SUB_ID = "gas-depth-cancel";
+    string internal constant SUBSCRIBE_ALLOWANCE_SUB_ID = "gas-depth-subscribe-allowance";
 
     // --- Nonce depth: claimCreatorFee(bytes32) ---
 
@@ -102,6 +103,28 @@ contract GasTest is BaseTest {
         _gasCancelSubscriptionNonceDepth(10_000);
     }
 
+    // --- Nonce depth: subscribeWithAllowance ---
+
+    function test_gas_subscribeWithAllowance_nonceDepth_1() public {
+        _gasSubscribeWithAllowanceNonceDepth(1);
+    }
+
+    function test_gas_subscribeWithAllowance_nonceDepth_10() public {
+        _gasSubscribeWithAllowanceNonceDepth(10);
+    }
+
+    function test_gas_subscribeWithAllowance_nonceDepth_100() public {
+        _gasSubscribeWithAllowanceNonceDepth(100);
+    }
+
+    function test_gas_subscribeWithAllowance_nonceDepth_1000() public {
+        _gasSubscribeWithAllowanceNonceDepth(1000);
+    }
+
+    function test_gas_subscribeWithAllowance_nonceDepth_10000() public {
+        _gasSubscribeWithAllowanceNonceDepth(10_000);
+    }
+
     // --- Internal helpers ---
 
     function _depthSub(string memory subId) internal view returns (bytes32) {
@@ -189,6 +212,27 @@ contract GasTest is BaseTest {
         asset.cancelSubscription(subscriberId, signature);
         uint256 gasUsed = vm.stopSnapshotGas();
 
+        _logGas(depth, gasUsed);
+    }
+
+    /// @dev Measures a renewal (new nonce) on top of `depth` stacked nonces.
+    function _gasSubscribeWithAllowanceNonceDepth(uint256 depth) internal {
+        bytes32 subscriber = _depthSub(SUBSCRIBE_ALLOWANCE_SUB_ID);
+        _buildStackedNonceDepth(subscriber, depth);
+
+        uint256 price = SUBSCRIPTION_PRICE + (depth * 100);
+        vm.prank(assetOwner);
+        asset.setSubscriptionPrice(price);
+
+        vm.prank(signer);
+        testToken.approve(address(asset), price);
+
+        vm.prank(signer);
+        vm.startSnapshotGas("gas/subscribeWithAllowance_nonceDepth", vm.toString(depth));
+        asset.subscribeWithAllowance(subscriber, 1, price);
+        uint256 gasUsed = vm.stopSnapshotGas();
+
+        assertEq(asset.getSubscriptionExpiration(subscriber), block.timestamp + (depth + 1) * SUBSCRIPTION_DURATION);
         _logGas(depth, gasUsed);
     }
 
