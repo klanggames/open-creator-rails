@@ -600,4 +600,69 @@ contract AssetRegistryTest is BaseTest {
 
         assertEq(assetRegistry.getSubscriptionExpiration(ASSET_ID, _subscriber), newEnd);
     }
+
+    // ─── subscribeWithAllowance ───────────────────────────────────────────────
+
+    function test_subscribeWithAllowance() public {
+        test_createAsset();
+
+        uint256 value = asset.getSubscriptionPrice(3);
+        uint256 signerBalanceBefore = testToken.balanceOf(signer);
+
+        vm.startPrank(signer);
+        testToken.approve(address(asset), value);
+        uint256 subscription = assetRegistry.subscribeWithAllowance(ASSET_ID, _subscriber, 3, SUBSCRIPTION_PRICE);
+        vm.stopPrank();
+
+        assertEq(subscription, block.timestamp + 3 * SUBSCRIPTION_DURATION);
+        assertEq(assetRegistry.getSubscriptionExpiration(ASSET_ID, _subscriber), subscription);
+        assertEq(testToken.balanceOf(signer), signerBalanceBefore - value);
+        assertEq(testToken.balanceOf(address(assetRegistry)), 0, "registry never holds payment");
+    }
+
+    function test_subscribeWithAllowance_payerIsRegistryCaller() public {
+        test_subscribeWithAllowance();
+
+        // The refund on cancel goes to the recorded payer; it must be the registry caller, not the registry.
+        vm.warp(block.timestamp + 1);
+        uint256 signerBalanceBefore = testToken.balanceOf(signer);
+        bytes memory signature = getCancellationSignature(SUBSCRIBER_ID, signer);
+        vm.prank(signer);
+        asset.cancelSubscription(SUBSCRIBER_ID, signature);
+
+        assertEq(testToken.balanceOf(signer), signerBalanceBefore + 2 * SUBSCRIPTION_PRICE);
+        assertEq(testToken.balanceOf(address(assetRegistry)), 0);
+    }
+
+    function test_subscribeWithAllowance_revertsOnPriceMismatch() public {
+        test_createAsset();
+
+        vm.prank(signer);
+        testToken.approve(address(asset), type(uint256).max);
+        vm.prank(assetOwner);
+        asset.setSubscriptionPrice(SUBSCRIPTION_PRICE * 10);
+
+        vm.prank(signer);
+        vm.expectRevert(Asset.SubscriptionPriceMismatch.selector);
+        assetRegistry.subscribeWithAllowance(ASSET_ID, _subscriber, 1, SUBSCRIPTION_PRICE);
+    }
+
+    function test_subscribeWithAllowance_revertsWhenRevoked() public {
+        test_subscribeWithAllowance();
+        vm.prank(assetOwner);
+        asset.revokeSubscription(_subscriber);
+
+        vm.startPrank(signer);
+        testToken.approve(address(asset), asset.getSubscriptionPrice(1));
+        // Enforced by the asset; the registry does not repeat the check.
+        vm.expectRevert(Asset.OnlyUnrevokedUnauthorizedSubscriber.selector);
+        assetRegistry.subscribeWithAllowance(ASSET_ID, _subscriber, 1, SUBSCRIPTION_PRICE);
+        vm.stopPrank();
+    }
+
+    function test_subscribeWithAllowance_assetNotFound() public {
+        vm.prank(signer);
+        vm.expectRevert(AssetRegistry.AssetNotFound.selector);
+        assetRegistry.subscribeWithAllowance(keccak256("nonexistent"), _subscriber, 1, SUBSCRIPTION_PRICE);
+    }
 }
