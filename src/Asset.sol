@@ -346,7 +346,8 @@ contract Asset is Ownable, ReentrancyGuard, IAsset {
             }
 
             // startTime is aligned to this record's period grid (invariant: claimedAtTimestamp is
-            // either 0, a previous snappedEnd on this record's grid, or <= subscription.startTime).
+            // either 0, a previous snappedEnd on this record's grid, a fully claimed record's endTime,
+            // or <= subscription.startTime).
             uint256 startTime = Math.max(subscription.startTime, claimedAtTimestamp);
             uint256 endTime = Math.min(subscription.endTime, timestamp);
 
@@ -378,8 +379,13 @@ contract Asset is Ownable, ReentrancyGuard, IAsset {
                 claimable += registryFee;
             }
 
-            // Update the new claimed at timestamp to the end time of the last fully-passed period
-            claimedAtTimestamp = startTime + count * SUBSCRIPTION_DURATION;
+            // Update the new claimed at timestamp to the end time of the last fully-passed period, or to the
+            // subscription's end once it is reached so that revocation dust is not claimed again
+            if (endTime == subscription.endTime) {
+                claimedAtTimestamp = endTime;
+            } else {
+                claimedAtTimestamp = startTime + count * SUBSCRIPTION_DURATION;
+            }
         }
 
         return (claimable, claimedAtNonce, claimedAtTimestamp);
