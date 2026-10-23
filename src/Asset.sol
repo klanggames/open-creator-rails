@@ -347,6 +347,8 @@ contract Asset is Ownable, ReentrancyGuard, IAsset {
 
             // startTime is aligned to this record's period grid (invariant: claimedAtTimestamp is
             // either 0, a previous snappedEnd on this record's grid, or <= subscription.startTime).
+            // Exception: a record revoked mid-period, fully claimed, then extended in the same block starts
+            // from its old off-grid endTime; the extension adds whole periods, so the period count still holds.
             uint256 startTime = Math.max(subscription.startTime, claimedAtTimestamp);
             uint256 endTime = Math.min(subscription.endTime, timestamp);
 
@@ -355,12 +357,18 @@ contract Asset is Ownable, ReentrancyGuard, IAsset {
             // Count of fully-passed periods since startTime. No dust: endTime may be mid-period
             uint256 count = claimableDuration / SUBSCRIPTION_DURATION;
 
+            // End time of the last fully-passed period
+            uint256 claimedTo = startTime + count * SUBSCRIPTION_DURATION;
+
             uint256 dust = 0;
 
             if (endTime == subscription.endTime) {
                 uint256 dustDuration = claimableDuration - (count * SUBSCRIPTION_DURATION);
 
                 dust = (dustDuration * subscription.subscriptionPrice) / SUBSCRIPTION_DURATION;
+
+                // The subscription's end is reached, so move past the dust to claim it only once
+                claimedTo = endTime;
             }
 
             if (count == 0 && dust == 0) {
@@ -378,8 +386,7 @@ contract Asset is Ownable, ReentrancyGuard, IAsset {
                 claimable += registryFee;
             }
 
-            // Update the new claimed at timestamp to the end time of the last fully-passed period
-            claimedAtTimestamp = startTime + count * SUBSCRIPTION_DURATION;
+            claimedAtTimestamp = claimedTo;
         }
 
         return (claimable, claimedAtNonce, claimedAtTimestamp);
