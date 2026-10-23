@@ -542,6 +542,8 @@ contract AssetTest is BaseTest {
         assertEq(asset.claimCreatorFee(_subscriber), creatorFee);
         assertEq(asset.claimCreatorFee(_subscriber), 0);
         vm.stopPrank();
+
+        assertEq(testToken.balanceOf(assetOwner), creatorFee);
     }
 
     function test_claimCreatorFee_batch_duplicateAfterMidPeriodRevoke_claimsDustOnce() public {
@@ -565,6 +567,42 @@ contract AssetTest is BaseTest {
 
         vm.prank(assetOwner);
         assertEq(asset.claimCreatorFee(subscribers), creatorFee);
+
+        assertEq(testToken.balanceOf(assetOwner), creatorFee);
+    }
+
+    // A revoked record whose dust was claimed can be extended in the same block (unrevoke + same payer);
+    // the extension's whole periods must then be claimable exactly once on top of the dust
+    function test_claimCreatorFee_afterMidPeriodRevokeAndSameBlockExtension() public {
+        _subscribe(1);
+        _subscribeFor(_subscriberHash("other", signer), COUNT);
+
+        uint256 dustDuration = SUBSCRIPTION_DURATION / 3;
+        vm.warp(block.timestamp + dustDuration);
+
+        uint256 dust = (dustDuration * SUBSCRIPTION_PRICE) / SUBSCRIPTION_DURATION;
+        uint256 dustCreatorFee = dust - (dust * REGISTRY_FEE_SHARE) / 100;
+
+        vm.startPrank(assetOwner);
+        asset.revokeSubscription(_subscriber);
+        assertEq(asset.claimCreatorFee(_subscriber), dustCreatorFee);
+        asset.unrevokeSubscription(_subscriber);
+        vm.stopPrank();
+
+        uint256 revokedAt = block.timestamp;
+        _subscribe(1);
+        assertEq(asset.getSubscriptionExpiration(_subscriber), revokedAt + SUBSCRIPTION_DURATION);
+
+        vm.warp(revokedAt + SUBSCRIPTION_DURATION);
+
+        uint256 periodCreatorFee = SUBSCRIPTION_PRICE - (SUBSCRIPTION_PRICE * REGISTRY_FEE_SHARE) / 100;
+
+        vm.startPrank(assetOwner);
+        assertEq(asset.claimCreatorFee(_subscriber), periodCreatorFee);
+        assertEq(asset.claimCreatorFee(_subscriber), 0);
+        vm.stopPrank();
+
+        assertEq(testToken.balanceOf(assetOwner), dustCreatorFee + periodCreatorFee);
     }
 
     function test_revokeSubscription_endOfSubscription() public {

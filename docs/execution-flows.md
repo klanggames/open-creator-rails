@@ -444,19 +444,21 @@ for nonce = lastClaimedNonce → currentNonce:
     claimableDuration = endTime - startTime
     count             = claimableDuration / SUBSCRIPTION_DURATION   // whole periods
     fee               = count × subscription.subscriptionPrice
+    claimedTo         = startTime + count × SUBSCRIPTION_DURATION
 
     // dust: partial period at the very end of a fully-elapsed subscription
     if endTime == subscription.endTime:
         dustDuration = claimableDuration - (count × SUBSCRIPTION_DURATION)
         dust         = (dustDuration × subscription.subscriptionPrice) / SUBSCRIPTION_DURATION
         fee         += dust
+        claimedTo    = endTime   // move past the dust so it is claimed only once
 
     claimable += (isOwner ? fee - registryFee : registryFee)
-    claimedAtTimestamp = startTime + count × SUBSCRIPTION_DURATION
+    claimedAtTimestamp = claimedTo
 ```
 
 Key properties:
 - **Whole-period granularity for active subscriptions** — sub-period time is not distributed while a subscription is still running
-- **Dust distribution at subscription end** — once a subscription has fully elapsed (`endTime <= block.timestamp`), any partial period that was paid for but not yet distributed is included in the next claim, ensuring no tokens are permanently locked in the contract
+- **Dust distribution at subscription end** — once a subscription has fully elapsed (`endTime <= block.timestamp`), any partial period that was paid for but not yet distributed is included in the next claim, ensuring no tokens are permanently locked in the contract. The cursor then moves to `subscription.endTime`, so dust (e.g. from a mid-period revocation, which ends a subscription off the period grid) is paid only once
 - **Snapshot prices** — each `Subscription` record carries the price and fee share that were active at subscribe time; retroactive price changes do not affect already-paid subscriptions
 - **Independent cursors** — creator and registry each maintain their own `claimedAtTimestamp`/`claimedAtNonce`, so one party claiming does not affect the other's position
