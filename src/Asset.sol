@@ -162,7 +162,7 @@ contract Asset is Ownable, ReentrancyGuard, IAsset {
         emit SubscriptionPriceUpdated(newSubscriptionPrice);
     }
 
-    function getSubscriptionPrice(uint256 count) external view returns (uint256) {
+    function getSubscriptionPrice(uint256 count) public view returns (uint256) {
         return count * subscriptionPrice;
     }
 
@@ -171,7 +171,7 @@ contract Asset is Ownable, ReentrancyGuard, IAsset {
     }
 
     function getSubscriptionPriceAndDuration(uint256 count) external view returns (uint256 price, uint256 duration) {
-        price = count * subscriptionPrice;
+        price = getSubscriptionPrice(count);
         duration = count * SUBSCRIPTION_DURATION;
     }
 
@@ -243,7 +243,7 @@ contract Asset is Ownable, ReentrancyGuard, IAsset {
             revert InsufficientFunds();
         }
 
-        return count * subscriptionPrice;
+        return getSubscriptionPrice(count);
     }
 
     function _subscribe(bytes32 subscriber, address payer, uint256 count) internal returns (uint256 endTime) {

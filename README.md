@@ -843,7 +843,7 @@ All external functions for the registry and asset contracts, for use with JSON-R
 
 ---
 
-**subscribeWithAllowance** : Subscribes a subscriber using a prior ERC-20 allowance instead of a permit, for payers whose ECDSA permit the token rejects, e.g. EIP-7702-delegated EOAs (such as Privy-sponsored wallets), whose permits tokens like USDC verify via ERC-1271. `msg.sender` is the payer and the refund beneficiary on cancel/revoke, and must have approved this asset for at least `getSubscriptionPrice(count)`. Because an allowance is not bound to an amount, the caller passes the per-period price they agreed to; the call reverts with `SubscriptionPriceMismatch` if the price has changed. Reverts if the subscriber has been revoked.
+**subscribeWithAllowance** : Subscribes a subscriber using a prior ERC-20 allowance instead of a permit, for payers whose ECDSA permit the token rejects, e.g. EIP-7702-delegated EOAs (such as Privy-sponsored wallets), whose permits tokens like USDC verify via ERC-1271. `msg.sender` is the payer and the refund beneficiary on cancel/revoke, and must have approved this asset for at least `getSubscriptionPrice(count)`. Because an allowance is not bound to an amount, the caller passes the per-period price they agreed to; the call reverts with `SubscriptionPriceMismatch` if the price has changed. Reverts if the subscriber has been revoked. Note that a permit-based `subscribe` by the same payer overwrites the allowance (EIP-2612) and spends it, so a standing approval must be renewed afterwards.
 - Type: write
 - Permission: `onlyUnrevoked(subscriber)`
 > reverts if the subscriber has been revoked
