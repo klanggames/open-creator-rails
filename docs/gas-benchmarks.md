@@ -167,7 +167,7 @@ xychart
     title "Claim Creator Fee"
     x-axis "Nonce" [1, 10, 100, 1000, 10000]
     y-axis "Gas Cost" 0 --> 1000000000
-    line [105098, 235343, 1339904, 12496895, 135204301]
+    line [105225, 235929, 1345080, 12547971, 135714377]
 ```
 
 ```mermaid
@@ -175,7 +175,7 @@ xychart
     title "Claim Registry Fee"
     x-axis "Nonce" [1, 10, 100, 1000, 10000]
     y-axis "Gas Cost" 0 --> 1000000000
-    line [103847, 233994, 1337574, 12484749, 135093999]
+    line [103861, 234062, 1338182, 12490757, 135154007]
 ```
 
 ```mermaid
@@ -191,7 +191,7 @@ xychart
     title "Subscribe With Allowance"
     x-axis "Nonce" [1, 10, 100, 1000, 10000]
     y-axis "Gas Cost" 0 --> 1000000000
-    line [201232, 184132, 184132, 184132, 184132]
+    line [201275, 184175, 184175, 184175, 184175]
 ```
 
 <!-- End: generated -->

@@ -162,12 +162,8 @@ contract Asset is Ownable, ReentrancyGuard, IAsset {
         emit SubscriptionPriceUpdated(newSubscriptionPrice);
     }
 
-    function _getSubscriptionPrice(uint256 count) internal view returns (uint256) {
-        return count * subscriptionPrice;
-    }
-
     function getSubscriptionPrice(uint256 count) external view returns (uint256) {
-        return _getSubscriptionPrice(count);
+        return count * subscriptionPrice;
     }
 
     function getSubscriptionDuration() external view returns (uint256) {
@@ -175,7 +171,7 @@ contract Asset is Ownable, ReentrancyGuard, IAsset {
     }
 
     function getSubscriptionPriceAndDuration(uint256 count) external view returns (uint256 price, uint256 duration) {
-        price = _getSubscriptionPrice(count);
+        price = count * subscriptionPrice;
         duration = count * SUBSCRIPTION_DURATION;
     }
 
@@ -252,8 +248,7 @@ contract Asset is Ownable, ReentrancyGuard, IAsset {
         uint256 value = _getPaymentValue(count);
 
         // An allowance is not bound to an amount the way a permit signature is, so the payer pins the price.
-        // count > 0 here, so this holds exactly when expectedSubscriptionPrice equals subscriptionPrice.
-        if (value != count * expectedSubscriptionPrice) {
+        if (expectedSubscriptionPrice != subscriptionPrice) {
             revert SubscriptionPriceMismatch();
         }
 
@@ -267,7 +262,7 @@ contract Asset is Ownable, ReentrancyGuard, IAsset {
             revert InsufficientFunds();
         }
 
-        return _getSubscriptionPrice(count);
+        return count * subscriptionPrice;
     }
 
     function _subscribe(bytes32 subscriber, address payer, uint256 count) internal returns (uint256 endTime) {

@@ -1828,6 +1828,16 @@ contract AssetTest is BaseTest {
         asset.subscribeWithAllowance(_subscriber, 1, SUBSCRIPTION_PRICE);
     }
 
+    function test_subscribeWithAllowance_revertsOnOverflowingExpectedPrice() public {
+        // A garbage pin must surface as a price mismatch, not an arithmetic panic.
+        vm.prank(signer);
+        testToken.approve(address(asset), type(uint256).max);
+
+        vm.prank(signer);
+        vm.expectRevert(Asset.SubscriptionPriceMismatch.selector);
+        asset.subscribeWithAllowance(_subscriber, 2, type(uint256).max);
+    }
+
     function test_subscribeWithAllowance_succeedsWithUpdatedExpectedPrice() public {
         uint256 newPrice = SUBSCRIPTION_PRICE * 10;
         vm.prank(assetOwner);
