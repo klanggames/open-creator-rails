@@ -131,7 +131,7 @@ sequenceDiagram
 
 ### Extend Existing Subscription
 
-Triggered when the subscriber already exists **and** all conditions match: same payer, same subscription price, same registry fee share, and the current `endTime` is greater than `block.timestamp` (subscription is still active and contiguous).
+Triggered when the subscriber already exists **and** all conditions match: same payer, same subscription price, same registry fee share, the current `endTime` is greater than or equal to `block.timestamp` (subscription is still active and contiguous), and the record spans whole periods (it was not revoked mid-period).
 
 ```mermaid
 sequenceDiagram
@@ -151,7 +151,7 @@ sequenceDiagram
 
     A->>A: subscriber already in set
     A->>A: currentEndTime > now (block.timestamp)
-    A->>A: payer/price/feeShare unchanged?  YES
+    A->>A: payer/price/feeShare unchanged and record spans whole periods?  YES
     A->>A: subscriptions[id].endTime += duration  (in-place update, nonce unchanged)
     A-->>AR: emit SubscriptionExtended(subscriber, newEndTime)
     AR-->>P: return newEndTime
@@ -163,7 +163,7 @@ sequenceDiagram
 
 ### Renew Subscription (New Nonce)
 
-Triggered when the subscriber already exists but conditions differ (different payer, updated price, or updated registry fee share), or when the subscription has already expired (gap in coverage).
+Triggered when the subscriber already exists but conditions differ (different payer, updated price, or updated registry fee share), when the subscription has already expired (gap in coverage), or when the current record was revoked mid-period (it ends off the period grid, so it is never extended; e.g. unrevoke and resubscribe in the revoke's block).
 
 ```mermaid
 sequenceDiagram

@@ -348,7 +348,9 @@ contract Asset is Ownable, ReentrancyGuard, IAsset {
             }
 
             // startTime is aligned to this record's period grid (invariant: claimedAtTimestamp is
-            // either 0, a previous snappedEnd on this record's grid, or <= subscription.startTime).
+            // either 0, a previous snappedEnd on this record's grid, or <= subscription.startTime). The cursor can
+            // also be a revoked record's off-grid endTime, but that record is skipped above, and _subscribe never
+            // extends a record that is not whole periods long.
             uint256 startTime = Math.max(subscription.startTime, claimedAtTimestamp);
             uint256 endTime = Math.min(subscription.endTime, timestamp);
 
