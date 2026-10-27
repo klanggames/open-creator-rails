@@ -35,7 +35,7 @@ contract BaseTest is Test {
     uint256 internal otherKey;
 
     function setUp() public virtual {
-        testToken = new TestToken();
+        testToken = _newToken();
 
         key = vm.deriveKey(MNEMONIC, 0);
         otherKey = vm.deriveKey(MNEMONIC, 1);
@@ -57,6 +57,11 @@ contract BaseTest is Test {
             )
         );
         vm.stopPrank();
+    }
+
+    /// @dev Payment token for the test asset; override to test token-specific behavior.
+    function _newToken() internal virtual returns (TestToken) {
+        return new TestToken();
     }
 
     function getPermit(address owner, address spender, uint256 value, uint256 deadline)

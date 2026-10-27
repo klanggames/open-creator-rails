@@ -4,6 +4,7 @@ pragma solidity ^0.8.0;
 import {BaseTest} from "./Base.t.sol";
 import {Asset} from "../src/Asset.sol";
 import {Ownable} from "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
+import {IERC20Errors} from "lib/openzeppelin-contracts/contracts/interfaces/draft-IERC6093.sol";
 
 contract AssetTest is BaseTest {
     string internal constant OTHER_SUBSCRIBER_ID = "other_subscriber_id";
@@ -1707,5 +1708,161 @@ contract AssetTest is BaseTest {
         vm.prank(address(assetRegistry));
         (uint256 claimed,,) = asset.claimRegistryFee(_subscriber);
         assertEq(claimed, expectedFee);
+    }
+
+    // ─── subscribeWithAllowance ───────────────────────────────────────────────
+
+    function _subscribeWithAllowance(bytes32 subscriber, uint256 count) internal returns (uint256 subscription) {
+        uint256 value = asset.getSubscriptionPrice(count);
+        vm.startPrank(signer);
+        testToken.approve(address(asset), value);
+        subscription = asset.subscribeWithAllowance(subscriber, count, SUBSCRIPTION_PRICE);
+        vm.stopPrank();
+    }
+
+    function test_subscribeWithAllowance() public {
+        uint256 expectedFee = SUBSCRIPTION_PRICE;
+        uint256 signerBalanceBefore = testToken.balanceOf(signer);
+        uint256 assetBalanceBefore = testToken.balanceOf(address(asset));
+
+        vm.startPrank(signer);
+        testToken.approve(address(asset), asset.getSubscriptionPrice(1));
+        vm.expectEmit(true, true, true, true);
+        emit Asset.SubscriptionAdded(
+            _subscriber,
+            block.timestamp,
+            block.timestamp + SUBSCRIPTION_DURATION,
+            signer,
+            SUBSCRIPTION_PRICE,
+            assetRegistry.getRegistryFeeShare()
+        );
+        uint256 subscription = asset.subscribeWithAllowance(_subscriber, 1, SUBSCRIPTION_PRICE);
+        vm.stopPrank();
+
+        assertEq(subscription, block.timestamp + SUBSCRIPTION_DURATION);
+        assertEq(asset.getSubscriptionExpiration(_subscriber), subscription);
+        assertTrue(asset.isSubscriptionActive(_subscriber));
+        assertEq(testToken.balanceOf(address(asset)), assetBalanceBefore + expectedFee);
+        assertEq(testToken.balanceOf(signer), signerBalanceBefore - expectedFee);
+        assertEq(testToken.allowance(signer, address(asset)), 0, "allowance fully consumed");
+    }
+
+    function test_subscribeWithAllowance_multiplePeriods() public {
+        uint256 signerBalanceBefore = testToken.balanceOf(signer);
+        uint256 subscription = _subscribeWithAllowance(_subscriber, 3);
+        assertEq(subscription, block.timestamp + 3 * SUBSCRIPTION_DURATION);
+        assertEq(testToken.balanceOf(signer), signerBalanceBefore - 3 * SUBSCRIPTION_PRICE);
+    }
+
+    function test_subscribeWithAllowance_extendsActiveSubscription() public {
+        uint256 first = _subscribeWithAllowance(_subscriber, 1);
+
+        vm.startPrank(signer);
+        testToken.approve(address(asset), asset.getSubscriptionPrice(1));
+        vm.expectEmit(true, true, false, true);
+        emit Asset.SubscriptionExtended(_subscriber, first + SUBSCRIPTION_DURATION);
+        uint256 second = asset.subscribeWithAllowance(_subscriber, 1, SUBSCRIPTION_PRICE);
+        vm.stopPrank();
+        assertEq(second, first + SUBSCRIPTION_DURATION);
+    }
+
+    function test_subscribeWithAllowance_revertsWithoutAllowance() public {
+        uint256 value = asset.getSubscriptionPrice(1);
+        vm.prank(signer);
+        vm.expectRevert(
+            abi.encodeWithSelector(IERC20Errors.ERC20InsufficientAllowance.selector, address(asset), 0, value)
+        );
+        asset.subscribeWithAllowance(_subscriber, 1, SUBSCRIPTION_PRICE);
+    }
+
+    function test_subscribeWithAllowance_revertsOnZeroCount() public {
+        vm.prank(signer);
+        vm.expectRevert(Asset.InsufficientFunds.selector);
+        asset.subscribeWithAllowance(_subscriber, 0, SUBSCRIPTION_PRICE);
+    }
+
+    function test_subscribeWithAllowance_zeroCountWithStalePrice_revertsInsufficientFunds() public {
+        // Same error as the permit path for count == 0, regardless of the expected price.
+        vm.prank(signer);
+        vm.expectRevert(Asset.InsufficientFunds.selector);
+        asset.subscribeWithAllowance(_subscriber, 0, SUBSCRIPTION_PRICE + 1);
+    }
+
+    function test_subscribeWithAllowance_revertsWhenRevoked() public {
+        _subscribeWithAllowance(_subscriber, 1);
+        vm.prank(assetOwner);
+        asset.revokeSubscription(_subscriber);
+
+        uint256 value = asset.getSubscriptionPrice(1);
+        vm.startPrank(signer);
+        testToken.approve(address(asset), value);
+        vm.expectRevert(Asset.OnlyUnrevokedUnauthorizedSubscriber.selector);
+        asset.subscribeWithAllowance(_subscriber, 1, SUBSCRIPTION_PRICE);
+        vm.stopPrank();
+    }
+
+    function test_subscribeWithAllowance_revertsWhenPriceRaisedAfterApproval() public {
+        // A standing allowance (common for smart accounts) must not be charged at a price the payer never agreed to.
+        vm.prank(signer);
+        testToken.approve(address(asset), type(uint256).max);
+
+        vm.prank(assetOwner);
+        asset.setSubscriptionPrice(SUBSCRIPTION_PRICE * 10);
+
+        uint256 signerBalanceBefore = testToken.balanceOf(signer);
+        vm.prank(signer);
+        vm.expectRevert(Asset.SubscriptionPriceMismatch.selector);
+        asset.subscribeWithAllowance(_subscriber, 1, SUBSCRIPTION_PRICE);
+        assertEq(testToken.balanceOf(signer), signerBalanceBefore);
+    }
+
+    function test_subscribeWithAllowance_revertsWhenPriceLoweredAfterApproval() public {
+        vm.prank(signer);
+        testToken.approve(address(asset), type(uint256).max);
+
+        vm.prank(assetOwner);
+        asset.setSubscriptionPrice(SUBSCRIPTION_PRICE / 2);
+
+        vm.prank(signer);
+        vm.expectRevert(Asset.SubscriptionPriceMismatch.selector);
+        asset.subscribeWithAllowance(_subscriber, 1, SUBSCRIPTION_PRICE);
+    }
+
+    function test_subscribeWithAllowance_revertsOnOverflowingExpectedPrice() public {
+        // A garbage pin must surface as a price mismatch, not an arithmetic panic.
+        vm.prank(signer);
+        testToken.approve(address(asset), type(uint256).max);
+
+        vm.prank(signer);
+        vm.expectRevert(Asset.SubscriptionPriceMismatch.selector);
+        asset.subscribeWithAllowance(_subscriber, 2, type(uint256).max);
+    }
+
+    function test_subscribeWithAllowance_succeedsWithUpdatedExpectedPrice() public {
+        uint256 newPrice = SUBSCRIPTION_PRICE * 10;
+        vm.prank(assetOwner);
+        asset.setSubscriptionPrice(newPrice);
+
+        uint256 signerBalanceBefore = testToken.balanceOf(signer);
+        vm.startPrank(signer);
+        testToken.approve(address(asset), newPrice);
+        asset.subscribeWithAllowance(_subscriber, 1, newPrice);
+        vm.stopPrank();
+        assertEq(testToken.balanceOf(signer), signerBalanceBefore - newPrice);
+    }
+
+    function test_subscribeWithAllowance_payerIsSender() public {
+        // Cancelling refunds the payer recorded at subscribe time, which must be the sender.
+        // The test contract holds no tokens, so a wrong payer would leave the signer unrefunded.
+        _subscribeWithAllowance(_subscriber, 3);
+        assertEq(testToken.balanceOf(address(this)), 0);
+
+        vm.warp(block.timestamp + 1);
+        uint256 signerBalanceBefore = testToken.balanceOf(signer);
+        _cancelAsSubscriber();
+
+        // 1 second into a 3-period subscription: the current period is non-refundable, the remaining 2 are refunded.
+        assertEq(testToken.balanceOf(signer), signerBalanceBefore + 2 * SUBSCRIPTION_PRICE);
+        assertEq(testToken.balanceOf(address(this)), 0);
     }
 }

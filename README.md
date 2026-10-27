@@ -109,7 +109,7 @@ Create an asset in a registry (registry owner only):
 | `asset_id` | Human-readable identifier for the asset. The script hashes it with keccak256 to get the bytes32 used on-chain. |
 | `subscription_price` | Price for one subscription period, in the token’s smallest unit. Must be a non-zero multiple of 100 to ensure integer precision when splitting fees between the registry and creator (`fee × registryFeeShare / 100`). Total payment for `n` periods is `n * subscription_price` (see `getSubscriptionPrice`). |
 | `subscription_duration` | Length of one subscription period in seconds (non-zero). Subscriptions are always whole multiples of this duration. |
-| `token_address` | Address of the ERC20 contract used for subscription payments. Must implement ERC-2612 (Permits), as subscription payments use gasless permit approvals. |
+| `token_address` | Address of the ERC20 contract used for subscription payments. ERC-2612 (Permits) support is needed for `subscribe`, which pays via gasless permit approvals; `subscribeWithAllowance` works with a plain `approve`. |
 | `owner` | Creator/owner address of the asset; receives the creator share of subscription fees. |
 | `registry_owner_private_key` | Private key of the registry owner; used to authorize the `createAsset` transaction. |
 
@@ -119,7 +119,7 @@ Example:
 ./scripts/createAsset.sh .env.local 0 "default_asset_id" 4 3600 0x1234... 0xabcd... 0x1b97...
 ```
 
-The token address must implement ERC-2612 / IERC20Permit, as subscription payments use gasless permit approvals.
+`subscribe` pays via gasless permit approvals, so it needs a token that implements ERC-2612 / IERC20Permit. `subscribeWithAllowance` pays from a prior `approve` and works with any ERC-20.
 
 New assets are appended to the `assets` array of the corresponding registry in `deployments/registries_<chain_id>.json`. Each asset entry includes `address`, `assetId`, `assetIdHash`, `subscriptionPrice`, `subscriptionDuration`, `tokenAddress`, and `owner`.
 
@@ -442,7 +442,7 @@ All external functions for the registry and asset contracts, for use with JSON-R
   - `bytes32 _assetId` : Unique identifier for the asset.
   - `uint256 _subscriptionPrice` : Price per subscription period for the asset. Must be a non-zero multiple of 100; reverts with `InvalidSubscriptionPrice` otherwise.
   - `uint256 _subscriptionDuration` : Fixed period length in seconds (non-zero). Subscriptions are whole multiples of this duration.
-  - `address _tokenAddress` : ERC20 (with permit) used for subscription payments.
+  - `address _tokenAddress` : ERC20 used for subscription payments; permit support is needed only for `subscribe`.
   - `address _owner` : Creator/owner of the new asset.
 - Returns:
   - `address` : Address of the newly deployed Asset contract.
@@ -732,7 +732,7 @@ All external functions for the registry and asset contracts, for use with JSON-R
 - Permission: none
 - Parameters: none
 - Returns:
-  - `address` : Token contract address (ERC20 with permit).
+  - `address` : Token contract address (ERC20; permit support is needed only for `subscribe`).
 
 
 ---
@@ -837,6 +837,20 @@ All external functions for the registry and asset contracts, for use with JSON-R
   - `uint8 v` : Signature recovery id.
   - `bytes32 r` : Signature r.
   - `bytes32 s` : Signature s.
+- Returns:
+  - `uint256` : Subscription expiry in Unix timestamp.
+
+
+---
+
+**subscribeWithAllowance** : Subscribes a subscriber using a prior ERC-20 allowance instead of a permit, for payers whose ECDSA permit the token rejects, e.g. EIP-7702-delegated EOAs (such as Privy-sponsored wallets), whose permits tokens like USDC verify via ERC-1271. `msg.sender` is the payer and the refund beneficiary on cancel/revoke, and must have approved this asset for at least `getSubscriptionPrice(count)`. An allowance caps the total amount but, unlike a permit, does not fix the per-period price, so the caller passes the price they agreed to; the call reverts with `SubscriptionPriceMismatch` if the price has changed. Reverts if the subscriber has been revoked. Note that a permit-based `subscribe` by the same payer overwrites the allowance (EIP-2612) and spends it, so a standing approval must be renewed afterwards.
+- Type: write
+- Permission: `onlyUnrevoked(subscriber)`
+> reverts if the subscriber has been revoked
+- Parameters:
+  - `bytes32 subscriber` : Hash of the subscriber identity (who gets the access). Recommended canonical form: `keccak256(abi.encode(subscriberId, subscriberAddress))`.
+  - `uint256 count` : Number of full subscription periods to subscribe for (must be at least 1).
+  - `uint256 expectedSubscriptionPrice` : Per-period price the payer agreed to; must equal the current subscription price.
 - Returns:
   - `uint256` : Subscription expiry in Unix timestamp.
 
