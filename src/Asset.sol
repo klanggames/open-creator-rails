@@ -226,25 +226,6 @@ contract Asset is Ownable, ReentrancyGuard, IAsset {
         onlyUnrevoked(subscriber)
         returns (uint256)
     {
-        return _subscribeWithAllowance(subscriber, msg.sender, count, expectedSubscriptionPrice);
-    }
-
-    /// @inheritdoc IAsset
-    function subscribeWithAllowanceViaRegistry(
-        bytes32 subscriber,
-        address payer,
-        uint256 count,
-        uint256 expectedSubscriptionPrice
-    ) external nonReentrant onlyRegistry onlyUnrevoked(subscriber) returns (uint256) {
-        return _subscribeWithAllowance(subscriber, payer, count, expectedSubscriptionPrice);
-    }
-
-    function _subscribeWithAllowance(
-        bytes32 subscriber,
-        address payer,
-        uint256 count,
-        uint256 expectedSubscriptionPrice
-    ) internal returns (uint256) {
         uint256 value = _getPaymentValue(count);
 
         // An allowance is not bound to an amount the way a permit signature is, so the payer pins the price.
@@ -252,9 +233,9 @@ contract Asset is Ownable, ReentrancyGuard, IAsset {
             revert SubscriptionPriceMismatch();
         }
 
-        SafeERC20.safeTransferFrom(TOKEN_CONTRACT, payer, address(this), value);
+        SafeERC20.safeTransferFrom(TOKEN_CONTRACT, msg.sender, address(this), value);
 
-        return _subscribe(subscriber, payer, count);
+        return _subscribe(subscriber, msg.sender, count);
     }
 
     function _getPaymentValue(uint256 count) internal view returns (uint256) {

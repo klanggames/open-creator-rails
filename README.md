@@ -576,21 +576,6 @@ All external functions for the registry and asset contracts, for use with JSON-R
 
 ---
 
-**subscribeWithAllowance** : Subscribes a subscriber to the asset using a prior ERC-20 allowance instead of a permit; forwards to the asset contract. For payers whose ECDSA permit the token rejects, e.g. EIP-7702-delegated EOAs (such as Privy-sponsored wallets), whose permits tokens like USDC verify via ERC-1271. `msg.sender` is the payer and the refund beneficiary on cancel/revoke, and must have approved the **asset contract** (`getAsset(_assetId)`, not the registry) for at least `getSubscriptionPrice(_assetId, _count)`. Reverts with `SubscriptionPriceMismatch` if `_expectedSubscriptionPrice` differs from the asset's current price, and with `OnlyUnrevokedUnauthorizedSubscriber` if the subscriber has been revoked for the asset.
-- Type: write
-- Permission: `onlyUnrevoked(_assetId, _subscriber)`
-> reverts if the subscriber has been permanently revoked for the asset
-- Parameters:
-  - `bytes32 _assetId` : Asset identifier.
-  - `bytes32 _subscriber` : Hash of the subscriber identity (who gets the access). Recommended canonical form: `keccak256(abi.encode(subscriberId, subscriberAddress))`.
-  - `uint256 _count` : Number of full subscription periods to subscribe for (must be at least 1).
-  - `uint256 _expectedSubscriptionPrice` : Per-period price the payer agreed to; must equal the asset's current subscription price.
-- Returns:
-  - `uint256` : Subscription expiry in Unix timestamp.
-
-
----
-
 **getCreatorFeeShare** : Returns the creator fee share percentage. Computed as `100 - registryFeeShare`.
 - Type: read
 - Permission: none
@@ -866,20 +851,6 @@ All external functions for the registry and asset contracts, for use with JSON-R
   - `bytes32 subscriber` : Hash of the subscriber identity (who gets the access). Recommended canonical form: `keccak256(abi.encode(subscriberId, subscriberAddress))`.
   - `uint256 count` : Number of full subscription periods to subscribe for (must be at least 1).
   - `uint256 expectedSubscriptionPrice` : Per-period price the payer agreed to; must equal the current subscription price.
-- Returns:
-  - `uint256` : Subscription expiry in Unix timestamp.
-
-
----
-
-**subscribeWithAllowanceViaRegistry** : Registry-routed variant of `subscribeWithAllowance`, called by `AssetRegistry.subscribeWithAllowance`. The registry passes its own caller as `payer`, so the payer must have approved this asset, not the registry.
-- Type: write
-- Permission: `onlyRegistry`, `onlyUnrevoked(subscriber)`
-- Parameters:
-  - `bytes32 subscriber` : Hash of the subscriber identity.
-  - `address payer` : Payer and refund beneficiary (the registry's caller).
-  - `uint256 count` : Number of full subscription periods to subscribe for (must be at least 1).
-  - `uint256 expectedSubscriptionPrice` : Per-period price the payer agreed to.
 - Returns:
   - `uint256` : Subscription expiry in Unix timestamp.
 

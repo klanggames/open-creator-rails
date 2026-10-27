@@ -143,17 +143,6 @@ contract AssetRegistry is Ownable, IAssetRegistry {
         return IAsset(asset).subscribe(_subscriber, _payer, _spender, _count, _deadline, _v, _r, _s);
     }
 
-    function subscribeWithAllowance(
-        bytes32 _assetId,
-        bytes32 _subscriber,
-        uint256 _count,
-        uint256 _expectedSubscriptionPrice
-    ) external onlyUnrevoked(_assetId, _subscriber) returns (uint256) {
-        address asset = getAsset(_assetId);
-        return
-            IAsset(asset).subscribeWithAllowanceViaRegistry(_subscriber, msg.sender, _count, _expectedSubscriptionPrice);
-    }
-
     function getCreatorFeeShare() external view returns (uint256) {
         return 100 - registryFeeShare;
     }

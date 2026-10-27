@@ -3,7 +3,6 @@ pragma solidity ^0.8.0;
 
 import {BaseTest} from "./Base.t.sol";
 import {IAsset} from "../src/IAsset.sol";
-import {IAssetRegistry} from "../src/IAssetRegistry.sol";
 
 /// @dev Minimal stand-in for the EIP-7702 delegate behind Privy native gas sponsorship (Alchemy Modular Account v2).
 ///      Calls arrive from the ERC-4337 EntryPoint, so a paymaster pays the gas, and are executed from the
@@ -82,23 +81,6 @@ contract Eip7702PayerTest is BaseTest {
         assertEq(asset.getSubscriptionExpiration(_subscriber), block.timestamp + 3 * SUBSCRIPTION_DURATION);
         assertEq(testToken.balanceOf(signer), signerBalanceBefore - 3 * SUBSCRIPTION_PRICE);
         assertEq(testToken.allowance(signer, address(asset)), 0);
-    }
-
-    function test_sponsoredSubscribeViaRegistry() public {
-        uint256 signerBalanceBefore = testToken.balanceOf(signer);
-
-        Mock7702Account.Call[] memory calls = new Mock7702Account.Call[](2);
-        calls[0] = Mock7702Account.Call(
-            address(testToken), abi.encodeCall(testToken.approve, (address(asset), asset.getSubscriptionPrice(2)))
-        );
-        calls[1] = Mock7702Account.Call(
-            address(assetRegistry),
-            abi.encodeCall(IAssetRegistry.subscribeWithAllowance, (ASSET_ID, _subscriber, 2, SUBSCRIPTION_PRICE))
-        );
-        _sponsored(calls);
-
-        assertEq(testToken.balanceOf(signer), signerBalanceBefore - 2 * SUBSCRIPTION_PRICE);
-        assertEq(testToken.balanceOf(address(assetRegistry)), 0);
     }
 
     function test_sponsoredCancel_refundsDelegatedEoa() public {

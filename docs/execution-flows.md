@@ -199,30 +199,27 @@ sequenceDiagram
 
 For payers whose ECDSA permit the token rejects, e.g. EIP-7702-delegated EOAs (such as Privy-sponsored wallets), whose permits tokens like USDC verify via ERC-1271. The payer `approve`s the **asset contract** (not the registry) beforehand, and `msg.sender` is always the payer and the refund beneficiary on cancel/revoke. Because an allowance is not bound to an amount the way a permit is, the payer pins `expectedSubscriptionPrice`, and the call reverts with `SubscriptionPriceMismatch` if the price has changed.
 
-The payer can call the asset directly (`Asset.subscribeWithAllowance`) or go through the registry, shown below. The extend / renew logic is the same as for `subscribe`.
+Unlike `subscribe`, there is no registry route: the payer calls the asset directly (its address is `AssetRegistry.getAsset(assetId)`), since `msg.sender` is what identifies the payer. The extend / renew logic is the same as for `subscribe`.
 
 ```mermaid
 sequenceDiagram
     actor P as Payer
     participant ERC20 as ERC20 Token
-    participant AR as AssetRegistry
     participant A as Asset
 
     Note over P: 1. Approve the asset (once, or per subscription)
     P->>ERC20: approve(asset, ≥ count×price)
 
     Note over P: 2. Submit on-chain
-    P->>AR: subscribeWithAllowance(assetId, subscriber,<br/>count, expectedSubscriptionPrice)
-    AR->>AR: onlyUnrevoked — revert if subscriber revoked
-    AR->>A: subscribeWithAllowanceViaRegistry(subscriber, payer=msg.sender,<br/>count, expectedSubscriptionPrice)
-    A->>A: onlyRegistry + onlyUnrevoked checks
+    P->>A: subscribeWithAllowance(subscriber, count, expectedSubscriptionPrice)
+    A->>A: onlyUnrevoked — revert if subscriber revoked
     A->>A: revert SubscriptionPriceMismatch if expectedSubscriptionPrice ≠ subscriptionPrice
-    A->>ERC20: safeTransferFrom(payer, asset, count×price)
+    A->>ERC20: safeTransferFrom(msg.sender, asset, count×price)
     ERC20-->>A: tokens transferred
 
-    A->>A: new / extend / renew, as for subscribe
-    A-->>AR: emit SubscriptionAdded / Extended / Renewed
-    AR-->>P: return endTime
+    A->>A: new / extend / renew, as for subscribe (payer = msg.sender)
+    A-->>P: emit SubscriptionAdded / Extended / Renewed
+    A-->>P: return endTime
 ```
 
 ---

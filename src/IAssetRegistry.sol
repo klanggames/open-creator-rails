@@ -107,24 +107,6 @@ interface IAssetRegistry {
         bytes32 _s
     ) external returns (uint256);
 
-    /// @notice Subscribes a subscriber hash using a prior ERC-20 allowance; forwards to the asset contract.
-    ///         `msg.sender` is the payer and refund beneficiary, and must have approved the asset contract
-    ///         (`getAsset(_assetId)`, not this registry) for `getSubscriptionPrice(_assetId, _count)`.
-    ///         Reverts if the subscriber has been revoked for this asset, or if `_expectedSubscriptionPrice`
-    ///         differs from the asset's current per-duration price.
-    /// @param _assetId Asset identifier.
-    /// @param _subscriber Subscriber hash (recommended canonical form:
-    ///        keccak256(abi.encode(subscriberId, subscriberAddress))).
-    /// @param _count Number of full subscription durations to subscribe for. Must be > 0.
-    /// @param _expectedSubscriptionPrice Per-duration price the payer agreed to.
-    /// @return Subscription expiry in Unix timestamp.
-    function subscribeWithAllowance(
-        bytes32 _assetId,
-        bytes32 _subscriber,
-        uint256 _count,
-        uint256 _expectedSubscriptionPrice
-    ) external returns (uint256);
-
     /// @notice Returns the creator fee share.
     /// @return creatorFeeShare The creator fee share.
     function getCreatorFeeShare() external view returns (uint256);
