@@ -272,6 +272,57 @@ contract AssetRegistryTest is BaseTest {
         assertEq(testToken.balanceOf(registryOwner), tokenBalance + registryFee);
     }
 
+    // Revocation dust must be claimable once; another subscriber's prepaid funds must stay in the contract
+    function test_claimRegistryFee_afterMidPeriodRevoke_claimsDustOnce() public {
+        uint256 tokenBalance = testToken.balanceOf(registryOwner);
+        _subscribe(1);
+        _subscribeFor(keccak256(abi.encode("other", signer)), COUNT);
+
+        uint256 dustDuration = SUBSCRIPTION_DURATION / 3;
+        vm.warp(block.timestamp + dustDuration);
+
+        vm.prank(assetOwner);
+        asset.revokeSubscription(_subscriber);
+
+        vm.warp(block.timestamp + 1);
+
+        uint256 dust = (dustDuration * SUBSCRIPTION_PRICE) / SUBSCRIPTION_DURATION;
+        uint256 registryFee = assetRegistry.getRegistryFee(dust);
+
+        vm.startPrank(registryOwner);
+        assertEq(assetRegistry.claimRegistryFee(ASSET_ID, _subscriber), registryFee);
+        assertEq(assetRegistry.claimRegistryFee(ASSET_ID, _subscriber), 0);
+        vm.stopPrank();
+
+        assertEq(testToken.balanceOf(registryOwner), tokenBalance + registryFee);
+    }
+
+    function test_claimRegistryFee_batch_duplicateAfterMidPeriodRevoke_claimsDustOnce() public {
+        uint256 tokenBalance = testToken.balanceOf(registryOwner);
+        _subscribe(1);
+        _subscribeFor(keccak256(abi.encode("other", signer)), COUNT);
+
+        uint256 dustDuration = SUBSCRIPTION_DURATION / 3;
+        vm.warp(block.timestamp + dustDuration);
+
+        vm.prank(assetOwner);
+        asset.revokeSubscription(_subscriber);
+
+        vm.warp(block.timestamp + 1);
+
+        uint256 dust = (dustDuration * SUBSCRIPTION_PRICE) / SUBSCRIPTION_DURATION;
+        uint256 registryFee = assetRegistry.getRegistryFee(dust);
+
+        bytes32[] memory subscribers = new bytes32[](2);
+        subscribers[0] = _subscriber;
+        subscribers[1] = _subscriber;
+
+        vm.prank(registryOwner);
+        assertEq(assetRegistry.claimRegistryFee(ASSET_ID, subscribers), registryFee);
+
+        assertEq(testToken.balanceOf(registryOwner), tokenBalance + registryFee);
+    }
+
     function test_claimRegistryFee_multiple() public {
         uint256 tokenBalance = testToken.balanceOf(registryOwner);
         for (uint256 i = 0; i < 10; i++) {
