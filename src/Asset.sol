@@ -228,7 +228,7 @@ contract Asset is Ownable, ReentrancyGuard, IAsset {
     {
         uint256 value = _getPaymentValue(count);
 
-        // An allowance is not bound to an amount the way a permit signature is, so the payer pins the price.
+        // An allowance caps the amount but, unlike a permit, does not fix the per-period price, so the payer pins it.
         if (expectedSubscriptionPrice != subscriptionPrice) {
             revert SubscriptionPriceMismatch();
         }

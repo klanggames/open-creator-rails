@@ -197,7 +197,7 @@ sequenceDiagram
 
 ### Subscribe with Allowance
 
-For payers whose ECDSA permit the token rejects, e.g. EIP-7702-delegated EOAs (such as Privy-sponsored wallets), whose permits tokens like USDC verify via ERC-1271. The payer `approve`s the **asset contract** (not the registry) beforehand, and `msg.sender` is always the payer and the refund beneficiary on cancel/revoke. Because an allowance is not bound to an amount the way a permit is, the payer pins `expectedSubscriptionPrice`, and the call reverts with `SubscriptionPriceMismatch` if the price has changed. `expectedSubscriptionPrice` should be the price the user agreed to, not one read on-chain just before the call, or the guard does nothing.
+For payers whose ECDSA permit the token rejects, e.g. EIP-7702-delegated EOAs (such as Privy-sponsored wallets), whose permits tokens like USDC verify via ERC-1271. The payer `approve`s the **asset contract** (not the registry) beforehand, and `msg.sender` is always the payer and the refund beneficiary on cancel/revoke. An allowance caps the total amount but, unlike a permit, does not fix the per-period price, so the payer pins `expectedSubscriptionPrice`, and the call reverts with `SubscriptionPriceMismatch` if the price has changed. `expectedSubscriptionPrice` should be the price the user agreed to, not one read on-chain just before the call, or the guard does nothing.
 
 A standing approval does not survive a permit-based `subscribe` by the same payer: EIP-2612 `permit` overwrites the allowance with exactly `count × price`, which that subscribe then spends, leaving 0. Approve again before the next `subscribeWithAllowance`.
 

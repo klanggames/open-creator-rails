@@ -2,7 +2,10 @@
 pragma solidity ^0.8.0;
 
 import {BaseTest} from "./Base.t.sol";
+import {Asset} from "../src/Asset.sol";
 import {IAsset} from "../src/IAsset.sol";
+import {TestToken} from "../src/TestToken.sol";
+import {SignatureChecker} from "lib/openzeppelin-contracts/contracts/utils/cryptography/SignatureChecker.sol";
 
 /// @dev Minimal stand-in for the EIP-7702 delegate behind Privy native gas sponsorship (Alchemy Modular Account v2).
 ///      Calls arrive from the ERC-4337 EntryPoint, so a paymaster pays the gas, and are executed from the
@@ -37,11 +40,39 @@ contract Mock7702Account {
     }
 }
 
+/// @dev Checks permits like USDC (FiatToken v2.2): ECDSA for an owner without code, ERC-1271 for one with code.
+contract Erc1271PermitToken is TestToken {
+    bytes32 private constant PERMIT_TYPEHASH =
+        keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
+
+    function permit(address owner, address spender, uint256 value, uint256 deadline, uint8 v, bytes32 r, bytes32 s)
+        public
+        override
+    {
+        if (block.timestamp > deadline) {
+            revert ERC2612ExpiredSignature(deadline);
+        }
+
+        bytes32 hash =
+            _hashTypedDataV4(keccak256(abi.encode(PERMIT_TYPEHASH, owner, spender, value, _useNonce(owner), deadline)));
+
+        if (!SignatureChecker.isValidSignatureNow(owner, hash, abi.encodePacked(r, s, v))) {
+            revert ERC2612InvalidSigner(address(0), owner);
+        }
+
+        _approve(owner, spender, value);
+    }
+}
+
 /// @notice Privy native gas sponsorship: the payer is an EOA delegated via EIP-7702 and every call is sponsored
 ///         through the EntryPoint. Such an EOA has code, so tokens that verify permits via ERC-1271 for
 ///         code-bearing owners (USDC FiatToken v2.2) reject its ECDSA permit; the allowance path is the way in.
 contract Eip7702PayerTest is BaseTest {
     address internal constant ENTRY_POINT = address(0x4337);
+
+    function _newToken() internal override returns (TestToken) {
+        return new Erc1271PermitToken();
+    }
 
     function setUp() public override {
         super.setUp();
@@ -69,6 +100,21 @@ contract Eip7702PayerTest is BaseTest {
         calls[1] = Mock7702Account.Call(
             address(asset), abi.encodeCall(IAsset.subscribeWithAllowance, (_subscriber, count, SUBSCRIPTION_PRICE))
         );
+        _sponsored(calls);
+    }
+
+    function test_sponsoredPermitSubscribe_reverts() public {
+        // The delegated EOA's ECDSA permit is checked via ERC-1271 and rejected, so `subscribe` cannot be used.
+        uint256 value = asset.getSubscriptionPrice(1);
+        (uint8 v, bytes32 r, bytes32 s) = getPermit(signer, address(asset), value, block.timestamp);
+
+        Mock7702Account.Call[] memory calls = new Mock7702Account.Call[](1);
+        calls[0] = Mock7702Account.Call(
+            address(asset),
+            abi.encodeCall(IAsset.subscribe, (_subscriber, signer, address(asset), 1, block.timestamp, v, r, s))
+        );
+
+        vm.expectRevert(Asset.PermitFailed.selector);
         _sponsored(calls);
     }
 
