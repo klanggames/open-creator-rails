@@ -66,6 +66,7 @@ class IAsset {
   +Promise~bool~ IsSubscriptionActive(string subscriberId)
   +Promise~price, duration~ GetSubscriptionPriceAndDuration(BigInteger count);
   +Promise~DateTime~ Subscribe(string subscriberId, BigInteger count)
+  +Promise~DateTime~ SubscribeWithAllowance(string subscriberId, BigInteger count)
   +Promise CancelSubscription(string subscriberId)
   
 

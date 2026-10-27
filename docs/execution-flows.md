@@ -12,6 +12,7 @@ This document walks through the major execution flows in `AssetRegistry` and `As
    - [New Subscription](#new-subscription)
    - [Extend Existing Subscription](#extend-existing-subscription)
    - [Renew Subscription (New Nonce)](#renew-subscription-new-nonce)
+   - [Subscribe with Allowance](#subscribe-with-allowance)
 4. [cancelSubscription](#cancelsubscription)
 5. [revokeSubscription](#revokesubscription)
 6. [unrevokeSubscription](#unrevokesubscription)
@@ -31,7 +32,7 @@ This document walks through the major execution flows in `AssetRegistry` and `As
 | **Subscriber** | Off-chain identity represented as `keccak256(abi.encode(subscriberId, subscriberAddress))` |
 | **AssetRegistry** | Central registry that deploys `Asset` contracts and routes calls |
 | **Asset** | Per-creator contract that holds subscriptions and accrued fees |
-| **ERC20 (Permit)** | Payment token that supports EIP-2612 `permit` (gasless approval) |
+| **ERC20 (Permit)** | Payment token; `subscribe` needs EIP-2612 `permit` (gasless approval), `subscribeWithAllowance` only a prior `approve` |
 
 **Subscriber ID derivation:**
 ```
@@ -78,9 +79,9 @@ sequenceDiagram
 
 ## subscribe
 
-Subscribing always requires an **off-chain EIP-2612 permit signature** from the payer. This lets the `Asset` contract pull payment tokens without a prior on-chain `approve` transaction.
+`subscribe` requires an **off-chain EIP-2612 permit signature** from the payer. This lets the `Asset` contract pull payment tokens without a prior on-chain `approve` transaction. Payers whose permit the token rejects use [`subscribeWithAllowance`](#subscribe-with-allowance) instead.
 
-### Off-chain permit signature (required before every subscribe call)
+### Off-chain permit signature (required before every `subscribe` call)
 
 The payer signs an EIP-2612 permit off-chain:
 
@@ -194,6 +195,38 @@ sequenceDiagram
 
 ---
 
+### Subscribe with Allowance
+
+For payers whose ECDSA permit the token rejects, e.g. EIP-7702-delegated EOAs (such as Privy-sponsored wallets), whose permits tokens like USDC verify via ERC-1271. The payer `approve`s the **asset contract** (not the registry) beforehand, and `msg.sender` is always the payer and the refund beneficiary on cancel/revoke. Because an allowance is not bound to an amount the way a permit is, the payer pins `expectedSubscriptionPrice`, and the call reverts with `SubscriptionPriceMismatch` if the price has changed.
+
+The payer can call the asset directly (`Asset.subscribeWithAllowance`) or go through the registry, shown below. The extend / renew logic is the same as for `subscribe`.
+
+```mermaid
+sequenceDiagram
+    actor P as Payer
+    participant ERC20 as ERC20 Token
+    participant AR as AssetRegistry
+    participant A as Asset
+
+    Note over P: 1. Approve the asset (once, or per subscription)
+    P->>ERC20: approve(asset, ≥ count×price)
+
+    Note over P: 2. Submit on-chain
+    P->>AR: subscribeWithAllowance(assetId, subscriber,<br/>count, expectedSubscriptionPrice)
+    AR->>AR: onlyUnrevoked — revert if subscriber revoked
+    AR->>A: subscribeWithAllowanceViaRegistry(subscriber, payer=msg.sender,<br/>count, expectedSubscriptionPrice)
+    A->>A: onlyRegistry + onlyUnrevoked checks
+    A->>A: revert SubscriptionPriceMismatch if expectedSubscriptionPrice ≠ subscriptionPrice
+    A->>ERC20: safeTransferFrom(payer, asset, count×price)
+    ERC20-->>A: tokens transferred
+
+    A->>A: new / extend / renew, as for subscribe
+    A-->>AR: emit SubscriptionAdded / Extended / Renewed
+    AR-->>P: return endTime
+```
+
+---
+
 ## cancelSubscription
 
 A subscriber cancels their own subscription. Because the `subscriber` bytes32 is derived from an off-chain string identity, the caller must prove they know the pre-image by providing an **ECDSA self-signature**.
@@ -292,7 +325,7 @@ sequenceDiagram
     A-->>C: emit SubscriptionUnrevoked(subscriber)
 ```
 
-> After unrevoking, the subscriber may call `subscribe` again. Their prior subscription history (nonces, claim cursors) is preserved.
+> After unrevoking, the subscriber may call `subscribe` or `subscribeWithAllowance` again. Their prior subscription history (nonces, claim cursors) is preserved.
 
 ---
 

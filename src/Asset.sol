@@ -14,7 +14,7 @@ import {ECDSA} from "lib/openzeppelin-contracts/contracts/utils/cryptography/ECD
 import {MessageHashUtils} from "lib/openzeppelin-contracts/contracts/utils/cryptography/MessageHashUtils.sol";
 
 /// @title Asset
-/// @notice Implementation of IAsset: a subscription-gated asset with permit-based ERC20 payment.
+/// @notice Implementation of IAsset: a subscription-gated asset paid in ERC20, via permit or a prior allowance.
 ///         Deployed by the asset registry; subscription revenue is split between creator (owner) and registry.
 contract Asset is Ownable, ReentrancyGuard, IAsset {
     using EnumerableSet for EnumerableSet.Bytes32Set;
@@ -103,7 +103,7 @@ contract Asset is Ownable, ReentrancyGuard, IAsset {
     /// @param _assetId Unique identifier for this asset.
     /// @param _subscriptionPrice Price per subscription period.
     /// @param _subscriptionDuration Fixed subscription period length in seconds; subscriptions must be whole multiples.
-    /// @param _tokenAddress ERC20 (with permit) used for subscription payments.
+    /// @param _tokenAddress ERC20 used for subscription payments; permit support is needed only for `subscribe`.
     /// @param _owner Creator/owner of the asset; receives creator share of subscription fees.
     constructor(
         bytes32 _assetId,
