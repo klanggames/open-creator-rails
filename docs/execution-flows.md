@@ -150,7 +150,7 @@ sequenceDiagram
     A->>ERC20: permit + safeTransferFrom (payment pulled)
 
     A->>A: subscriber already in set
-    A->>A: currentEndTime > now (block.timestamp)
+    A->>A: currentEndTime >= now (block.timestamp)
     A->>A: payer/price/feeShare unchanged and record spans whole periods?  YES
     A->>A: subscriptions[id].endTime += duration  (in-place update, nonce unchanged)
     A-->>AR: emit SubscriptionExtended(subscriber, newEndTime)
@@ -182,7 +182,7 @@ sequenceDiagram
     A->>ERC20: permit + safeTransferFrom
 
     A->>A: subscriber already in set
-    A->>A: conditions differ OR expired gap
+    A->>A: conditions differ OR expired gap OR revoked mid-period
     A->>A: nonces[subscriber]++ → new nonce
     A->>A: id = keccak256(subscriber, newNonce)
     A->>A: store new Subscription{startTime, endTime, price, feeShare, payer}

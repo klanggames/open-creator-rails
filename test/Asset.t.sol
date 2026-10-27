@@ -521,6 +521,12 @@ contract AssetTest is BaseTest {
         vm.stopPrank();
 
         assertEq(testToken.balanceOf(assetOwner), creatorFee);
+
+        vm.prank(address(assetRegistry));
+        asset.claimRegistryFee(_subscriber);
+
+        // Everything owed for _subscriber is paid out; only the other subscriber's prepayment is left
+        assertEq(testToken.balanceOf(address(asset)), COUNT * SUBSCRIPTION_PRICE);
     }
 
     function test_claimCreatorFee_afterRevokeWithElapsedPeriods_claimsDustOnce() public {
@@ -544,6 +550,12 @@ contract AssetTest is BaseTest {
         vm.stopPrank();
 
         assertEq(testToken.balanceOf(assetOwner), creatorFee);
+
+        vm.prank(address(assetRegistry));
+        asset.claimRegistryFee(_subscriber);
+
+        // Everything owed for _subscriber is paid out; only the other subscriber's prepayment is left
+        assertEq(testToken.balanceOf(address(asset)), COUNT * SUBSCRIPTION_PRICE);
     }
 
     function test_claimCreatorFee_batch_duplicateAfterMidPeriodRevoke_claimsDustOnce() public {
@@ -569,6 +581,12 @@ contract AssetTest is BaseTest {
         assertEq(asset.claimCreatorFee(subscribers), creatorFee);
 
         assertEq(testToken.balanceOf(assetOwner), creatorFee);
+
+        vm.prank(address(assetRegistry));
+        asset.claimRegistryFee(_subscriber);
+
+        // Everything owed for _subscriber is paid out; only the other subscriber's prepayment is left
+        assertEq(testToken.balanceOf(address(asset)), COUNT * SUBSCRIPTION_PRICE);
     }
 
     // A record revoked mid-period ends off the period grid, so resubscribing in the same block (unrevoke + same
@@ -617,6 +635,12 @@ contract AssetTest is BaseTest {
         vm.stopPrank();
 
         assertEq(testToken.balanceOf(assetOwner), creatorFee);
+
+        vm.prank(address(assetRegistry));
+        asset.claimRegistryFee(_subscriber);
+
+        // Everything owed for _subscriber is paid out; only the other subscriber's prepayment is left
+        assertEq(testToken.balanceOf(address(asset)), COUNT * SUBSCRIPTION_PRICE);
     }
 
     function test_revokeSubscription_endOfSubscription() public {
