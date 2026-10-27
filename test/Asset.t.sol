@@ -571,9 +571,9 @@ contract AssetTest is BaseTest {
         assertEq(testToken.balanceOf(assetOwner), creatorFee);
     }
 
-    // A revoked record whose dust was claimed can be extended in the same block (unrevoke + same payer);
-    // the extension's whole periods must then be claimable exactly once on top of the dust
-    function test_claimCreatorFee_afterMidPeriodRevokeAndSameBlockExtension() public {
+    // A record revoked mid-period ends off the period grid, so resubscribing in the same block (unrevoke + same
+    // payer) must start a new record instead of extending it; a second revoke must then refund correctly
+    function test_subscribe_afterMidPeriodRevokeInSameBlock_startsNewRecord() public {
         _subscribe(1);
         _subscribeFor(_subscriberHash("other", signer), COUNT);
 
@@ -581,28 +581,42 @@ contract AssetTest is BaseTest {
         vm.warp(block.timestamp + dustDuration);
 
         uint256 dust = (dustDuration * SUBSCRIPTION_PRICE) / SUBSCRIPTION_DURATION;
-        uint256 dustCreatorFee = dust - (dust * REGISTRY_FEE_SHARE) / 100;
 
         vm.startPrank(assetOwner);
         asset.revokeSubscription(_subscriber);
-        assertEq(asset.claimCreatorFee(_subscriber), dustCreatorFee);
+        asset.claimCreatorFee(_subscriber);
         asset.unrevokeSubscription(_subscriber);
         vm.stopPrank();
 
         uint256 revokedAt = block.timestamp;
+
+        vm.expectEmit(true, true, true, true);
+        emit Asset.SubscriptionRenewed(
+            _subscriber, revokedAt, revokedAt + SUBSCRIPTION_DURATION, 1, signer, SUBSCRIPTION_PRICE, REGISTRY_FEE_SHARE
+        );
         _subscribe(1);
-        assertEq(asset.getSubscriptionExpiration(_subscriber), revokedAt + SUBSCRIPTION_DURATION);
 
-        vm.warp(revokedAt + SUBSCRIPTION_DURATION);
+        uint256 elapsedDuration = SUBSCRIPTION_DURATION / 2;
+        vm.warp(revokedAt + elapsedDuration);
 
-        uint256 periodCreatorFee = SUBSCRIPTION_PRICE - (SUBSCRIPTION_PRICE * REGISTRY_FEE_SHARE) / 100;
+        uint256 payerBalance = testToken.balanceOf(signer);
+        uint256 used = (elapsedDuration * SUBSCRIPTION_PRICE) / SUBSCRIPTION_DURATION;
+
+        vm.prank(assetOwner);
+        asset.revokeSubscription(_subscriber);
+
+        assertEq(testToken.balanceOf(signer), payerBalance + SUBSCRIPTION_PRICE - used);
+
+        vm.warp(block.timestamp + 1);
+
+        uint256 creatorFee = (dust - (dust * REGISTRY_FEE_SHARE) / 100) + (used - (used * REGISTRY_FEE_SHARE) / 100);
 
         vm.startPrank(assetOwner);
-        assertEq(asset.claimCreatorFee(_subscriber), periodCreatorFee);
+        asset.claimCreatorFee(_subscriber);
         assertEq(asset.claimCreatorFee(_subscriber), 0);
         vm.stopPrank();
 
-        assertEq(testToken.balanceOf(assetOwner), dustCreatorFee + periodCreatorFee);
+        assertEq(testToken.balanceOf(assetOwner), creatorFee);
     }
 
     function test_revokeSubscription_endOfSubscription() public {

@@ -241,11 +241,13 @@ contract Asset is Ownable, ReentrancyGuard, IAsset {
             startTime = Math.max(startTime, subscription.endTime);
 
             // Extend existing subscription if still active and subscription price, registry fee share,
-            // and payer are the same.
+            // and payer are the same. A record revoked mid-period is not on its period grid, which the claim
+            // and refund math rely on, so it is never extended.
             if (
                 startTime == subscription.endTime && subscription.payer == payer
                     && subscription.subscriptionPrice == subscriptionPrice
                     && subscription.registryFeeShare == registryFeeShare
+                    && (subscription.endTime - subscription.startTime) % SUBSCRIPTION_DURATION == 0
             ) {
                 endTime = subscription.endTime + duration;
 
@@ -347,8 +349,6 @@ contract Asset is Ownable, ReentrancyGuard, IAsset {
 
             // startTime is aligned to this record's period grid (invariant: claimedAtTimestamp is
             // either 0, a previous snappedEnd on this record's grid, or <= subscription.startTime).
-            // Exception: a record revoked mid-period, fully claimed, then extended in the same block starts
-            // from its old off-grid endTime; the extension adds whole periods, so the period count still holds.
             uint256 startTime = Math.max(subscription.startTime, claimedAtTimestamp);
             uint256 endTime = Math.min(subscription.endTime, timestamp);
 
