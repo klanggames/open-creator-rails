@@ -289,11 +289,13 @@ contract Asset is Ownable, ReentrancyGuard, IAsset {
             startTime = Math.max(startTime, subscription.endTime);
 
             // Extend existing subscription if still active and subscription price, registry fee share,
-            // and payer are the same.
+            // and payer are the same. A record revoked mid-period is not on its period grid, which the claim
+            // and refund math rely on, so it is never extended.
             if (
                 startTime == subscription.endTime && subscription.payer == payer
                     && subscription.subscriptionPrice == subscriptionPrice
                     && subscription.registryFeeShare == registryFeeShare
+                    && (subscription.endTime - subscription.startTime) % SUBSCRIPTION_DURATION == 0
             ) {
                 endTime = subscription.endTime + duration;
 
@@ -394,7 +396,9 @@ contract Asset is Ownable, ReentrancyGuard, IAsset {
             }
 
             // startTime is aligned to this record's period grid (invariant: claimedAtTimestamp is
-            // either 0, a previous snappedEnd on this record's grid, or <= subscription.startTime).
+            // either 0, a previous snappedEnd on this record's grid, or <= subscription.startTime). The cursor can
+            // also be a revoked record's off-grid endTime, but that record is skipped above, and _subscribe never
+            // extends a record that is not whole periods long.
             uint256 startTime = Math.max(subscription.startTime, claimedAtTimestamp);
             uint256 endTime = Math.min(subscription.endTime, timestamp);
 
@@ -403,12 +407,18 @@ contract Asset is Ownable, ReentrancyGuard, IAsset {
             // Count of fully-passed periods since startTime. No dust: endTime may be mid-period
             uint256 count = claimableDuration / SUBSCRIPTION_DURATION;
 
+            // End time of the last fully-passed period
+            uint256 claimedTo = startTime + count * SUBSCRIPTION_DURATION;
+
             uint256 dust = 0;
 
             if (endTime == subscription.endTime) {
                 uint256 dustDuration = claimableDuration - (count * SUBSCRIPTION_DURATION);
 
                 dust = (dustDuration * subscription.subscriptionPrice) / SUBSCRIPTION_DURATION;
+
+                // The subscription's end is reached, so move past the dust to claim it only once
+                claimedTo = endTime;
             }
 
             if (count == 0 && dust == 0) {
@@ -426,8 +436,7 @@ contract Asset is Ownable, ReentrancyGuard, IAsset {
                 claimable += registryFee;
             }
 
-            // Update the new claimed at timestamp to the end time of the last fully-passed period
-            claimedAtTimestamp = startTime + count * SUBSCRIPTION_DURATION;
+            claimedAtTimestamp = claimedTo;
         }
 
         return (claimable, claimedAtNonce, claimedAtTimestamp);
